@@ -1,0 +1,53 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0 20px;
+}
+
+.header-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.header-title .accent-a { color: var(--accent-a); }
+.header-title .accent-b { color: var(--accent-b); }
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bw-badge {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: background 0.3s;
+}
+
+.sync-dot.connected {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green-dim);
+}
+
+.sync-dot.error,
+.sync-dot.disconnected {
+  background: var(--red);
+}
+
+.sync-dot.syncing {
+  background: var(--yellow);
+  animation: pulse-dot 0.8s ease infinite;
+}

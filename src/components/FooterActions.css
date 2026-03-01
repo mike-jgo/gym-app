@@ -1,0 +1,47 @@
+.footer-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+  padding-bottom: 20px;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 16px;
+  border-radius: var(--radius);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn:active {
+  transform: scale(0.97);
+}
+
+.action-btn.save {
+  border-color: var(--green);
+  color: var(--green);
+  background: var(--green-dim);
+}
+
+.action-btn.export.workout-a {
+  border-color: var(--accent-a);
+  color: var(--accent-a);
+  background: var(--accent-a-dim);
+}
+
+.action-btn.export.workout-b {
+  border-color: var(--accent-b);
+  color: var(--accent-b);
+  background: var(--accent-b-dim);
+}
+
+.action-btn.clear {
+  border-color: var(--red);
+  color: var(--red);
+}

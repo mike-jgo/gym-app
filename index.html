@@ -55,12 +55,49 @@
     font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px;
   }
   .header h1 span { color: var(--accent); }
+  .header-right { display: flex; align-items: center; gap: 8px; }
   .bw-badge {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.7rem; color: var(--text-dim);
     background: var(--surface); border: 1px solid var(--border);
     padding: 4px 10px; border-radius: 20px;
   }
+  .sync-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.3s;
+  }
+  .sync-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green-dim); }
+  .sync-dot.error { background: var(--red); }
+  .sync-dot.syncing { background: var(--yellow); animation: pulse-dot 0.8s ease infinite; }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Setup Banner */
+  .setup-banner {
+    background: var(--surface); border: 1px solid var(--yellow);
+    border-radius: var(--radius); padding: 16px;
+    margin-bottom: 20px; display: none;
+  }
+  .setup-banner.show { display: block; }
+  .setup-banner h3 {
+    font-size: 0.9rem; color: var(--yellow); margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .setup-banner p { font-size: 0.82rem; color: var(--text-dim); line-height: 1.5; margin-bottom: 10px; }
+  .setup-input {
+    width: 100%; padding: 10px 12px; border-radius: 10px;
+    border: 1.5px solid var(--border); background: var(--surface2);
+    color: var(--text); font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem; margin-bottom: 8px;
+  }
+  .setup-input:focus { outline: none; border-color: var(--yellow); }
+  .setup-save {
+    padding: 10px 20px; border-radius: 10px; border: none;
+    background: var(--yellow); color: var(--bg);
+    font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.85rem;
+    cursor: pointer;
+  }
+  .setup-save:active { transform: scale(0.97); }
 
   /* Workout Toggle */
   .toggle-row {
@@ -173,7 +210,8 @@
     color: var(--text); cursor: pointer; transition: all 0.2s;
   }
   .action-btn:active { transform: scale(0.97); }
-  .action-btn.export { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+  .action-btn.save { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+  .action-btn.export { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
   .action-btn.clear { border-color: var(--red); color: var(--red); }
 
   /* Toast */
@@ -187,8 +225,8 @@
     z-index: 100; pointer-events: none;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--red); color: #fff; }
 
-  /* Scrollbar */
   ::-webkit-scrollbar { width: 0; }
 </style>
 </head>
@@ -196,7 +234,18 @@
 
 <div class="header">
   <h1>FBEOD <span id="workoutLabel">A</span></h1>
-  <span class="bw-badge">BW 64.5 kg</span>
+  <div class="header-right">
+    <span class="bw-badge">BW 64.5 kg</span>
+    <div class="sync-dot" id="syncDot" title="Google Sheets sync status"></div>
+  </div>
+</div>
+
+<!-- Setup Banner (shown if no API URL configured) -->
+<div class="setup-banner" id="setupBanner">
+  <h3>⚡ CONNECT GOOGLE SHEETS</h3>
+  <p>Paste your Google Apps Script Web App URL below to enable cloud sync. See the setup guide for instructions.</p>
+  <input class="setup-input" id="apiUrlInput" placeholder="https://script.google.com/macros/s/...../exec">
+  <button class="setup-save" onclick="saveApiUrl()">CONNECT</button>
 </div>
 
 <div class="toggle-row">
@@ -212,6 +261,7 @@
 <div id="exerciseList"></div>
 
 <div class="footer-actions">
+  <button class="action-btn save" onclick="saveSession()">SAVE</button>
   <button class="action-btn export" onclick="exportSession()">EXPORT</button>
   <button class="action-btn clear" onclick="clearSession()">CLEAR</button>
 </div>
@@ -219,6 +269,9 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// =====================================================
+// CONFIG
+// =====================================================
 const WORKOUTS = {
   A: [
     { id: 'bb_bench',    name: 'Barbell Bench Press',      sets: 4 },
@@ -242,10 +295,94 @@ let currentWorkout = 'A';
 let timerInterval = null;
 let timerSeconds = 90;
 let timerRunning = false;
+let lastLiftCache = {}; // cache of last-lift data from Sheets
 
-// --- LocalStorage helpers ---
+// =====================================================
+// GOOGLE SHEETS API (via Apps Script)
+// =====================================================
+function getApiUrl() {
+  return localStorage.getItem('fbeod_api_url') || '';
+}
+
+function saveApiUrl() {
+  const url = document.getElementById('apiUrlInput').value.trim();
+  if (!url) return;
+  localStorage.setItem('fbeod_api_url', url);
+  document.getElementById('setupBanner').classList.remove('show');
+  setSyncStatus('syncing');
+  // Test connection & load data
+  loadLastLifts().then(() => {
+    setSyncStatus('connected');
+    showToast('Connected to Google Sheets!');
+    render();
+  }).catch(() => {
+    setSyncStatus('error');
+    showToast('Connection failed — check URL', true);
+  });
+}
+
+function checkSetup() {
+  const url = getApiUrl();
+  if (!url) {
+    document.getElementById('setupBanner').classList.add('show');
+    setSyncStatus('error');
+  } else {
+    setSyncStatus('syncing');
+    loadLastLifts().then(() => {
+      setSyncStatus('connected');
+      render();
+    }).catch(() => {
+      setSyncStatus('error');
+    });
+  }
+}
+
+function setSyncStatus(status) {
+  const dot = document.getElementById('syncDot');
+  dot.className = 'sync-dot';
+  if (status === 'connected') dot.classList.add('connected');
+  else if (status === 'error') dot.classList.add('error');
+  else if (status === 'syncing') dot.classList.add('syncing');
+}
+
+// POST workout session to Google Sheets
+async function postToSheets(workout, exercisesData) {
+  const url = getApiUrl();
+  if (!url) throw new Error('No API URL');
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' }, // Apps Script needs this for CORS
+    body: JSON.stringify({
+      action: 'save',
+      workout: workout,
+      date: new Date().toISOString(),
+      bodyweight: 64.5,
+      exercises: exercisesData
+    })
+  });
+  const result = await response.json();
+  if (result.status !== 'ok') throw new Error(result.message || 'Save failed');
+  return result;
+}
+
+// GET last-lift data from Google Sheets
+async function loadLastLifts() {
+  const url = getApiUrl();
+  if (!url) throw new Error('No API URL');
+
+  const response = await fetch(`${url}?action=lastLifts`);
+  const result = await response.json();
+  if (result.status === 'ok') {
+    lastLiftCache = result.data || {};
+  }
+  return result;
+}
+
+// =====================================================
+// LOCAL STORAGE (for current session inputs only)
+// =====================================================
 function lsKey(exId, set, field) { return `fbeod_${exId}_s${set}_${field}`; }
-function lsLastKey(exId) { return `fbeod_last_${exId}`; }
 
 function saveField(exId, set, field, value) {
   localStorage.setItem(lsKey(exId, set, field), value);
@@ -253,39 +390,38 @@ function saveField(exId, set, field, value) {
 function loadField(exId, set, field) {
   return localStorage.getItem(lsKey(exId, set, field)) || '';
 }
-function saveLast(exId, data) {
-  localStorage.setItem(lsLastKey(exId), JSON.stringify(data));
-}
-function loadLast(exId) {
-  try { return JSON.parse(localStorage.getItem(lsLastKey(exId))); } catch { return null; }
-}
 
-// --- 1RM (Brzycki) ---
+// =====================================================
+// 1RM (Brzycki)
+// =====================================================
 function calc1RM(w, r) {
   if (!w || w <= 0 || !r || r <= 0 || r > 30) return 0;
   if (r === 1) return w;
   return w * (36 / (37 - r));
 }
 
-// --- Render ---
+// =====================================================
+// RENDER
+// =====================================================
 function render() {
   const list = document.getElementById('exerciseList');
   list.innerHTML = '';
   const exercises = WORKOUTS[currentWorkout];
 
   exercises.forEach(ex => {
-    const last = loadLast(ex.id);
+    // Use cached last-lift data from Sheets, fall back to localStorage
+    const last = lastLiftCache[ex.id] || null;
     const card = document.createElement('div');
     card.className = 'exercise-card';
 
     let lastHtml = '';
     if (last && last.sets && last.sets.length) {
       const summary = last.sets.map((s, i) => `<em>S${i+1}</em> ${s.w}×${s.r}`).join('  ');
-      lastHtml = `<div class="last-lift">LAST: ${summary}</div>`;
+      const dateStr = last.date ? `<span style="opacity:0.5;margin-left:6px">${last.date}</span>` : '';
+      lastHtml = `<div class="last-lift">LAST: ${summary}${dateStr}</div>`;
     }
 
     let setsHtml = '';
-    // Compute best 1RM across all sets for current inputs
     let best1RM = 0;
     for (let s = 1; s <= ex.sets; s++) {
       const w = loadField(ex.id, s, 'w');
@@ -314,7 +450,6 @@ function render() {
     list.appendChild(card);
   });
 
-  // Attach listeners
   list.querySelectorAll('.set-input').forEach(input => {
     input.addEventListener('input', handleInput);
   });
@@ -340,19 +475,22 @@ function update1RM(exId) {
   if (el) el.innerHTML = best > 0 ? `e1RM <strong>${best.toFixed(1)}</strong>` : 'e1RM —';
 }
 
-// --- Workout toggle ---
+// =====================================================
+// WORKOUT TOGGLE
+// =====================================================
 function switchWorkout(w) {
   currentWorkout = w;
   document.getElementById('workoutLabel').textContent = w;
   document.getElementById('btnA').classList.toggle('active', w === 'A');
   document.getElementById('btnB').classList.toggle('active', w === 'B');
-  // Update accent color
   document.documentElement.style.setProperty('--accent', w === 'A' ? 'var(--accent-a)' : 'var(--accent-b)');
   document.documentElement.style.setProperty('--accent-dim', w === 'A' ? 'var(--accent-a-dim)' : 'var(--accent-b-dim)');
   render();
 }
 
-// --- Timer ---
+// =====================================================
+// TIMER
+// =====================================================
 function toggleTimer() {
   if (timerRunning) { stopTimer(); } else { startTimer(); }
 }
@@ -362,41 +500,88 @@ function startTimer() {
   const btn = document.getElementById('timerBtn');
   const display = document.getElementById('timerDisplay');
   const bar = document.getElementById('timerBar');
-  btn.textContent = 'STOP';
-  btn.className = 'timer-btn stop';
+  btn.textContent = 'STOP'; btn.className = 'timer-btn stop';
   display.classList.remove('alert');
-
   timerInterval = setInterval(() => {
     timerSeconds--;
     const m = Math.floor(timerSeconds / 60);
     const s = timerSeconds % 60;
     display.textContent = `${m}:${s.toString().padStart(2, '0')}`;
     bar.style.setProperty('--timer-pct', `${((90 - timerSeconds) / 90) * 100}%`);
-
     if (timerSeconds <= 0) {
       stopTimer();
       display.classList.add('alert');
       display.textContent = 'GO!';
-      // Vibrate if available
       if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
     }
   }, 1000);
 }
 function stopTimer() {
   clearInterval(timerInterval);
-  timerRunning = false;
-  timerSeconds = 90;
+  timerRunning = false; timerSeconds = 90;
   const btn = document.getElementById('timerBtn');
   const display = document.getElementById('timerDisplay');
   const bar = document.getElementById('timerBar');
-  btn.textContent = 'REST';
-  btn.className = 'timer-btn start';
-  display.textContent = '1:30';
-  display.classList.remove('alert');
+  btn.textContent = 'REST'; btn.className = 'timer-btn start';
+  display.textContent = '1:30'; display.classList.remove('alert');
   bar.style.setProperty('--timer-pct', '0%');
 }
 
-// --- Export ---
+// =====================================================
+// SAVE SESSION (to Google Sheets)
+// =====================================================
+async function saveSession() {
+  const exercises = WORKOUTS[currentWorkout];
+  const exercisesData = [];
+
+  exercises.forEach(ex => {
+    const sets = [];
+    for (let s = 1; s <= ex.sets; s++) {
+      const w = loadField(ex.id, s, 'w');
+      const r = loadField(ex.id, s, 'r');
+      if (w || r) {
+        sets.push({ set: s, weight: parseFloat(w) || 0, reps: parseInt(r) || 0 });
+      }
+    }
+    if (sets.length) {
+      const best1RM = Math.max(...sets.map(s => calc1RM(s.weight, s.reps)));
+      exercisesData.push({
+        id: ex.id,
+        name: ex.name,
+        sets: sets,
+        best1RM: Math.round(best1RM * 10) / 10
+      });
+    }
+  });
+
+  if (!exercisesData.length) {
+    showToast('Nothing to save — enter some sets first', true);
+    return;
+  }
+
+  const apiUrl = getApiUrl();
+  if (!apiUrl) {
+    showToast('Connect Google Sheets first!', true);
+    document.getElementById('setupBanner').classList.add('show');
+    return;
+  }
+
+  setSyncStatus('syncing');
+  try {
+    await postToSheets(currentWorkout, exercisesData);
+    setSyncStatus('connected');
+    showToast('Saved to Google Sheets!');
+    // Refresh last-lift cache
+    await loadLastLifts();
+  } catch (err) {
+    setSyncStatus('error');
+    showToast('Save failed: ' + err.message, true);
+  }
+}
+
+// =====================================================
+// EXPORT (clipboard)
+// =====================================================
 function exportSession() {
   const exercises = WORKOUTS[currentWorkout];
   const date = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
@@ -404,23 +589,16 @@ function exportSession() {
 
   exercises.forEach(ex => {
     text += `\n${ex.name}\n`;
-    const setsData = [];
     for (let s = 1; s <= ex.sets; s++) {
       const w = loadField(ex.id, s, 'w');
       const r = loadField(ex.id, s, 'r');
-      if (w || r) {
-        text += `  S${s}: ${w || '—'} kg × ${r || '—'} reps\n`;
-        setsData.push({ w: w || '0', r: r || '0' });
-      }
+      if (w || r) text += `  S${s}: ${w || '—'} kg × ${r || '—'} reps\n`;
     }
-    // Save this as "last lift" data
-    if (setsData.length) saveLast(ex.id, { sets: setsData, date });
   });
 
   navigator.clipboard.writeText(text).then(() => {
     showToast('Copied to clipboard!');
   }).catch(() => {
-    // Fallback: create temp textarea
     const ta = document.createElement('textarea');
     ta.value = text; document.body.appendChild(ta);
     ta.select(); document.execCommand('copy');
@@ -429,38 +607,36 @@ function exportSession() {
   });
 }
 
-// --- Clear session ---
+// =====================================================
+// CLEAR SESSION
+// =====================================================
 function clearSession() {
   if (!confirm('Clear all weights/reps for Workout ' + currentWorkout + '?')) return;
   const exercises = WORKOUTS[currentWorkout];
   exercises.forEach(ex => {
-    // Save current as "last" before clearing
-    const setsData = [];
     for (let s = 1; s <= ex.sets; s++) {
-      const w = loadField(ex.id, s, 'w');
-      const r = loadField(ex.id, s, 'r');
-      if (w || r) setsData.push({ w: w || '0', r: r || '0' });
       localStorage.removeItem(lsKey(ex.id, s, 'w'));
       localStorage.removeItem(lsKey(ex.id, s, 'r'));
     }
-    if (setsData.length) {
-      const date = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
-      saveLast(ex.id, { sets: setsData, date });
-    }
   });
   render();
-  showToast('Session cleared — last lift saved');
+  showToast('Session cleared');
 }
 
-// --- Toast ---
-function showToast(msg) {
+// =====================================================
+// TOAST
+// =====================================================
+function showToast(msg, isError = false) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2200);
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => t.className = 'toast', 2400);
 }
 
-// --- Init ---
+// =====================================================
+// INIT
+// =====================================================
+checkSetup();
 render();
 </script>
 </body>

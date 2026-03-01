@@ -41,6 +41,30 @@
   background: var(--accent-b-dim);
 }
 
+.action-btn.export.workout-c {
+  border-color: var(--accent-c);
+  color: var(--accent-c);
+  background: var(--accent-c-dim);
+}
+
+.action-btn.export.workout-d {
+  border-color: var(--accent-d);
+  color: var(--accent-d);
+  background: var(--accent-d-dim);
+}
+
+.action-btn.export.workout-e {
+  border-color: var(--accent-e);
+  color: var(--accent-e);
+  background: var(--accent-e-dim);
+}
+
+.action-btn.export.workout-f {
+  border-color: var(--accent-f);
+  color: var(--accent-f);
+  background: var(--accent-f-dim);
+}
+
 .action-btn.clear {
   border-color: var(--red);
   color: var(--red);

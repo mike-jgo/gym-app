@@ -50,5 +50,9 @@
 
 .timer-btn.start.accent-a { background: var(--accent-a); color: var(--bg); }
 .timer-btn.start.accent-b { background: var(--accent-b); color: var(--bg); }
+.timer-btn.start.accent-c { background: var(--accent-c); color: var(--bg); }
+.timer-btn.start.accent-d { background: var(--accent-d); color: var(--bg); }
+.timer-btn.start.accent-e { background: var(--accent-e); color: var(--bg); }
+.timer-btn.start.accent-f { background: var(--accent-f); color: var(--bg); }
 .timer-btn.stop { background: var(--red); color: #fff; }
 .timer-btn:active { transform: scale(0.95); }

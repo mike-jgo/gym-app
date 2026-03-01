@@ -13,6 +13,10 @@
 
 .header-title .accent-a { color: var(--accent-a); }
 .header-title .accent-b { color: var(--accent-b); }
+.header-title .accent-c { color: var(--accent-c); }
+.header-title .accent-d { color: var(--accent-d); }
+.header-title .accent-e { color: var(--accent-e); }
+.header-title .accent-f { color: var(--accent-f); }
 
 .header-right {
   display: flex;

@@ -1,13 +1,17 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { calc1RM } from './utils/calc';
-import { loadField, clearFields } from './utils/storage';
+import { loadField, clearFields, loadBodyweight, saveBodyweight } from './utils/storage';
 import { useTimer } from './hooks/useTimer';
+import { useSessionTimer } from './hooks/useSessionTimer';
 import { useSheets } from './hooks/useSheets';
 import { useConfig } from './hooks/useConfig';
+import { formatElapsed } from './utils/date';
+
+import { fetchSessions } from './utils/sheets';
 
 import Header from './components/Header';
-import SetupBanner from './components/SetupBanner';
-import WorkoutSelector from './components/WorkoutSelector';
+import HomeScreen from './components/HomeScreen';
+import HistoryScreen from './components/HistoryScreen';
 import TimerBar from './components/TimerBar';
 import ExerciseCard from './components/ExerciseCard';
 import FooterActions from './components/FooterActions';
@@ -16,10 +20,13 @@ import ManageWorkouts from './components/ManageWorkouts';
 
 export default function App() {
   const [toast, setToast] = useState({ message: '', isError: false });
+  const [bodyweight, setBodyweight] = useState(() => loadBodyweight());
   const [fieldVersion, setFieldVersion] = useState(0);
   const [activeWorkoutId, setActiveWorkoutId] = useState(null);
-  const [screen, setScreen] = useState('tracker');
+  const [screen, setScreen] = useState('home');
+  const [saving, setSaving] = useState(false);
   const timer = useTimer();
+  const sessionTimer = useSessionTimer();
   const sheets = useSheets();
   const { config, saveConfig } = useConfig();
 
@@ -35,6 +42,13 @@ export default function App() {
   const workoutLabel = activeWorkout?.label ?? '';
   const exercises = activeWorkout?.exercises ?? [];
 
+  const handleBodyweightChange = (val) => {
+    const n = parseFloat(val);
+    if (!n || n <= 0) return;
+    saveBodyweight(n);
+    setBodyweight(n);
+  };
+
   const showToast = (message, isError = false) => {
     setToast({ message, isError });
   };
@@ -43,8 +57,32 @@ export default function App() {
     setFieldVersion((v) => v + 1);
   }, []);
 
-  // --- Save to Google Sheets ---
-  const handleSave = async () => {
+  // --- Back from session ---
+  const handleBack = () => {
+    const hasValues = exercises.some((ex) => {
+      for (let s = 1; s <= ex.sets; s++) {
+        if (loadField(ex.id, s, 'w') || loadField(ex.id, s, 'r')) return true;
+      }
+      return false;
+    });
+
+    if (hasValues && !confirm('Leave session? Your entered sets are preserved but the session won\'t be saved.')) {
+      return;
+    }
+
+    sessionTimer.reset();
+    setScreen('home');
+  };
+
+  // --- Start a session ---
+  const handleStartSession = (workoutId) => {
+    setActiveWorkoutId(workoutId);
+    sessionTimer.start();
+    setScreen('session');
+  };
+
+  // --- Complete session (save + clear + go home) ---
+  const handleComplete = async () => {
     const exercisesData = [];
 
     exercises.forEach((ex) => {
@@ -77,11 +115,19 @@ export default function App() {
       return;
     }
 
+    setSaving(true);
+    const duration = sessionTimer.stop();
     try {
-      await sheets.save({ workout: workoutLabel, exercises: exercisesData });
-      showToast('Saved to Google Sheets!');
+      await sheets.save({ workout: workoutLabel, workoutColor, bodyweight, exercises: exercisesData, duration });
+      exercises.forEach((ex) => clearFields(ex.id, ex.sets));
+      setFieldVersion((v) => v + 1);
+      setScreen('home');
+      showToast('Workout complete!');
     } catch (err) {
+      sessionTimer.start(); // resume timer if save failed
       showToast('Save failed: ' + err.message, true);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -90,7 +136,7 @@ export default function App() {
     const date = new Date().toLocaleDateString('en-GB', {
       day: '2-digit', month: 'short', year: 'numeric',
     });
-    let text = `FBEOD Workout ${workoutLabel} — ${date}\nBW: 64.5 kg\n${'─'.repeat(30)}\n`;
+    let text = `FBEOD Workout ${workoutLabel} — ${date}\nBW: ${bodyweight} kg\n${'─'.repeat(30)}\n`;
 
     exercises.forEach((ex) => {
       text += `\n${ex.name}\n`;
@@ -119,12 +165,11 @@ export default function App() {
   // --- Manage screen ---
   const handleManageSave = (newConfig) => {
     saveConfig(newConfig);
-    // If active workout was deleted, fall back to first
     const stillExists = newConfig.workouts.find((w) => w.id === activeWorkoutId);
     if (!stillExists) {
       setActiveWorkoutId(newConfig.workouts[0]?.id ?? null);
     }
-    setScreen('tracker');
+    setScreen('home');
     showToast('Workouts saved');
   };
 
@@ -133,19 +178,38 @@ export default function App() {
       <ManageWorkouts
         config={config}
         onSave={handleManageSave}
-        onCancel={() => setScreen('tracker')}
+        onCancel={() => setScreen('home')}
       />
     );
   }
 
   if (!config) return null;
 
-  return (
-    <>
-      <Header workoutColor={workoutColor} workoutLabel={workoutLabel} syncStatus={sheets.status} />
+  if (screen === 'history') {
+    return (
+      <>
+        <HistoryScreen
+          onBack={() => setScreen('home')}
+          onFetch={fetchSessions}
+        />
+        <Toast
+          message={toast.message}
+          isError={toast.isError}
+          onDone={() => setToast({ message: '', isError: false })}
+        />
+      </>
+    );
+  }
 
-      {!sheets.configured && (
-        <SetupBanner
+  if (screen === 'home') {
+    return (
+      <>
+        <HomeScreen
+          workouts={config.workouts}
+          onStart={handleStartSession}
+          onManage={() => setScreen('manage')}
+          onHistory={() => setScreen('history')}
+          sheetsConfigured={sheets.configured}
           onConnect={async (url) => {
             const ok = await sheets.connect(url);
             if (ok) showToast('Connected to Google Sheets!');
@@ -153,13 +217,25 @@ export default function App() {
             return ok;
           }}
         />
-      )}
+        <Toast
+          message={toast.message}
+          isError={toast.isError}
+          onDone={() => setToast({ message: '', isError: false })}
+        />
+      </>
+    );
+  }
 
-      <WorkoutSelector
-        workouts={config.workouts}
-        currentId={activeWorkout?.id}
-        onSelect={setActiveWorkoutId}
-        onManage={() => setScreen('manage')}
+  return (
+    <>
+      <Header
+        workoutColor={workoutColor}
+        workoutLabel={workoutLabel}
+        syncStatus={sheets.status}
+        bodyweight={bodyweight}
+        onBodyweightChange={handleBodyweightChange}
+        onBack={handleBack}
+        sessionElapsed={formatElapsed(sessionTimer.elapsed)}
       />
 
       <TimerBar
@@ -184,9 +260,10 @@ export default function App() {
 
       <FooterActions
         workoutColor={workoutColor}
-        onSave={handleSave}
+        onComplete={handleComplete}
         onExport={handleExport}
         onClear={handleClear}
+        saving={saving}
       />
 
       <Toast

@@ -5,6 +5,29 @@
   padding: 12px 0 20px;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 8px 0 0;
+  line-height: 1;
+}
+.back-btn:hover { color: var(--text); }
+
+.session-elapsed {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+}
+
 .header-title {
   font-size: 1.5rem;
   font-weight: 800;
@@ -31,7 +54,24 @@
   border: 1px solid var(--border);
   padding: 4px 10px;
   border-radius: 20px;
+  cursor: pointer;
 }
+.bw-badge:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+.bw-input {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text);
+  background: var(--surface2);
+  border: 1px solid var(--text-dim);
+  padding: 4px 10px;
+  border-radius: 20px;
+  width: 90px;
+  text-align: center;
+}
+.bw-input:focus { outline: none; border-color: var(--accent-a); }
 
 .sync-dot {
   width: 8px;

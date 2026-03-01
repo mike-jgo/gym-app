@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { calc1RM } from '../utils/calc';
 import { saveField, loadField } from '../utils/storage';
+import { formatDate } from '../utils/date';
 import './ExerciseCard.css';
 
 export default function ExerciseCard({ exercise, lastLift, workoutColor, fieldVersion, onFieldChange }) {
@@ -40,7 +41,7 @@ export default function ExerciseCard({ exercise, lastLift, workoutColor, fieldVe
             {i < lastLift.sets.length - 1 ? '  ' : ''}
           </span>
         ))}
-        {lastLift.date && <span className="last-date">{lastLift.date}</span>}
+        {lastLift.date && <span className="last-date">{formatDate(lastLift.date)}</span>}
       </div>
     );
   }

@@ -1,8 +1,9 @@
 // ============================================================
 // FBEOD Google Apps Script
-// 
+//
 // SETUP:
-// 1. Create a Google Sheet with tabs "Log" and "LastLifts"
+// 1. Create a Google Sheet with tabs "Log", "LastLifts", and "Config"
+//    (The "Sessions" tab is created automatically on first save)
 // 2. Log headers (Row 1): Date | Workout | Exercise | ExerciseID | Set | Weight | Reps | e1RM | Bodyweight
 // 3. LastLifts headers (Row 1): ExerciseID | Exercise | Date | Sets
 // 4. Extensions → Apps Script → paste this code
@@ -13,6 +14,7 @@
 const LOG_SHEET = 'Log';
 const LAST_SHEET = 'LastLifts';
 const CONFIG_SHEET = 'Config';
+const SESSIONS_SHEET = 'Sessions';
 
 // Handle GET requests (fetch data)
 function doGet(e) {
@@ -20,6 +22,10 @@ function doGet(e) {
 
   if (action === 'lastLifts') {
     return sendJson(getLastLifts());
+  }
+
+  if (action === 'sessions') {
+    return sendJson(getSessions());
   }
 
   if (action === 'allData') {
@@ -61,6 +67,7 @@ function saveWorkout(data) {
   const date = new Date(data.date);
   const dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'dd MMM yyyy');
   const workout = data.workout;
+  const workoutColor = data.workoutColor || '';
   const bodyweight = data.bodyweight;
 
   const rows = [];
@@ -88,6 +95,22 @@ function saveWorkout(data) {
   if (rows.length > 0) {
     logSheet.getRange(logSheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
   }
+
+  // Append session summary (auto-create Sessions sheet if missing)
+  var sessionsSheet = ss.getSheetByName(SESSIONS_SHEET);
+  if (!sessionsSheet) {
+    sessionsSheet = ss.insertSheet(SESSIONS_SHEET);
+    sessionsSheet.appendRow(['SessionID', 'Date', 'Workout', 'WorkoutColor', 'Bodyweight', 'Exercises', 'Duration']);
+  }
+  sessionsSheet.appendRow([
+    data.date,
+    dateStr,
+    workout,
+    workoutColor,
+    bodyweight,
+    JSON.stringify(data.exercises),
+    data.duration || 0
+  ]);
 
   return { status: 'ok', rowsSaved: rows.length };
 }
@@ -128,7 +151,7 @@ function getLastLifts() {
     try { sets = JSON.parse(data[i][3]); } catch(e) {}
     result[exId] = {
       name: data[i][1],
-      date: data[i][2],
+      date: formatDateVal(data[i][2], 'yyyy-MM-dd'),
       sets: sets
     };
   }
@@ -136,7 +159,35 @@ function getLastLifts() {
   return { status: 'ok', data: result };
 }
 
-// Get all log data (for Claude Code / analysis)
+// Get all sessions in reverse chronological order
+function getSessions() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SESSIONS_SHEET);
+  if (!sheet) return { status: 'ok', data: [] };
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { status: 'ok', data: [] };
+
+  var result = [];
+  for (var i = data.length - 1; i >= 1; i--) {
+    var exercises = [];
+    try { exercises = JSON.parse(data[i][5]); } catch(e) {}
+    var sessionId = data[i][0] instanceof Date ? data[i][0].toISOString() : String(data[i][0]);
+    result.push({
+      id: sessionId,
+      date: formatDateVal(data[i][0], 'yyyy-MM-dd HH:mm:ss'),
+      workout: data[i][2],
+      workoutColor: data[i][3],
+      bodyweight: data[i][4],
+      exercises: exercises,
+      duration: parseInt(data[i][6]) || 0
+    });
+  }
+
+  return { status: 'ok', data: result };
+}
+
+// Get all log data (for analysis)
 function getAllData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(LOG_SHEET);
@@ -198,6 +249,14 @@ function saveConfig(data) {
   }
 
   return { status: 'ok' };
+}
+
+// Format a value that may have been auto-converted to a Date by Sheets
+function formatDateVal(val, fmt) {
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, Session.getScriptTimeZone(), fmt);
+  }
+  return String(val);
 }
 
 // Brzycki 1RM formula

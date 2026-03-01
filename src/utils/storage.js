@@ -18,3 +18,11 @@ export function clearFields(exId, sets) {
     localStorage.removeItem(fieldKey(exId, s, 'r'));
   }
 }
+
+const BW_KEY = 'fbeod_bw';
+export function loadBodyweight() {
+  return parseFloat(localStorage.getItem(BW_KEY)) || 64.5;
+}
+export function saveBodyweight(value) {
+  localStorage.setItem(BW_KEY, String(value));
+}

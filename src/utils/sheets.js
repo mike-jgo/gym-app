@@ -11,7 +11,7 @@ export function setApiUrl(url) {
 /**
  * Save a workout session to Google Sheets
  */
-export async function saveWorkout({ workout, exercises, bodyweight = 64.5 }) {
+export async function saveWorkout({ workout, workoutColor = '', exercises, bodyweight = 64.5, duration = 0 }) {
   const url = getApiUrl();
   if (!url) throw new Error('No API URL configured');
 
@@ -21,9 +21,11 @@ export async function saveWorkout({ workout, exercises, bodyweight = 64.5 }) {
     body: JSON.stringify({
       action: 'save',
       workout,
+      workoutColor,
       date: new Date().toISOString(),
       bodyweight,
       exercises,
+      duration,
     }),
   });
 
@@ -44,6 +46,20 @@ export async function fetchLastLifts() {
 
   if (result.status !== 'ok') throw new Error(result.message || 'Fetch failed');
   return result.data || {};
+}
+
+/**
+ * Fetch session history (reverse chronological)
+ */
+export async function fetchSessions() {
+  const url = getApiUrl();
+  if (!url) throw new Error('No API URL configured');
+
+  const response = await fetch(`${url}?action=sessions`);
+  const result = await response.json();
+
+  if (result.status !== 'ok') throw new Error(result.message || 'Fetch failed');
+  return result.data || [];
 }
 
 /**

@@ -35,6 +35,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+button {
+  touch-action: manipulation;
+}
+
 body {
   font-family: 'Outfit', -apple-system, sans-serif;
   background: var(--bg);

@@ -1,11 +1,11 @@
 import React from 'react';
 import './Header.css';
 
-export default function Header({ workout, syncStatus }) {
+export default function Header({ workoutColor, workoutLabel, syncStatus }) {
   return (
     <div className="header">
       <h1 className="header-title mono">
-        FBEOD <span className={`accent-${workout.toLowerCase()}`}>{workout}</span>
+        FBEOD <span className={`accent-${workoutColor}`}>{workoutLabel}</span>
       </h1>
       <div className="header-right">
         <span className="bw-badge mono">BW 64.5 kg</span>

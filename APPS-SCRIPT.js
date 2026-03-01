@@ -12,6 +12,7 @@
 
 const LOG_SHEET = 'Log';
 const LAST_SHEET = 'LastLifts';
+const CONFIG_SHEET = 'Config';
 
 // Handle GET requests (fetch data)
 function doGet(e) {
@@ -25,6 +26,10 @@ function doGet(e) {
     return sendJson(getAllData());
   }
 
+  if (action === 'getConfig') {
+    return sendJson(getConfig());
+  }
+
   return sendJson({ status: 'error', message: 'Unknown action' });
 }
 
@@ -35,6 +40,10 @@ function doPost(e) {
 
     if (body.action === 'save') {
       return sendJson(saveWorkout(body));
+    }
+
+    if (body.action === 'saveConfig') {
+      return sendJson(saveConfig(body));
     }
 
     return sendJson({ status: 'error', message: 'Unknown action' });
@@ -144,6 +153,51 @@ function getAllData() {
   }
 
   return { status: 'ok', data: rows, count: rows.length };
+}
+
+// Get config from Config sheet
+function getConfig() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG_SHEET);
+  if (!sheet) return { status: 'ok', data: null };
+
+  const data = sheet.getDataRange().getValues();
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][0] === 'config') {
+      try {
+        return { status: 'ok', data: JSON.parse(data[i][1]) };
+      } catch(e) {
+        return { status: 'ok', data: null };
+      }
+    }
+  }
+  return { status: 'ok', data: null };
+}
+
+// Save config to Config sheet (upsert)
+function saveConfig(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG_SHEET);
+  if (!sheet) return { status: 'error', message: 'Config sheet not found' };
+
+  const configJson = JSON.stringify(data.config);
+  const rows = sheet.getDataRange().getValues();
+  var foundRow = -1;
+
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i][0] === 'config') {
+      foundRow = i + 1;
+      break;
+    }
+  }
+
+  if (foundRow > 0) {
+    sheet.getRange(foundRow, 2).setValue(configJson);
+  } else {
+    sheet.appendRow(['config', configJson]);
+  }
+
+  return { status: 'ok' };
 }
 
 // Brzycki 1RM formula

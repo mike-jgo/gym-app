@@ -1,26 +1,39 @@
-import React, { useState, useCallback } from 'react';
-import { WORKOUTS } from './utils/workouts';
+import React, { useState, useCallback, useEffect } from 'react';
 import { calc1RM } from './utils/calc';
 import { loadField, clearFields } from './utils/storage';
 import { useTimer } from './hooks/useTimer';
 import { useSheets } from './hooks/useSheets';
+import { useConfig } from './hooks/useConfig';
 
 import Header from './components/Header';
 import SetupBanner from './components/SetupBanner';
-import WorkoutToggle from './components/WorkoutToggle';
+import WorkoutSelector from './components/WorkoutSelector';
 import TimerBar from './components/TimerBar';
 import ExerciseCard from './components/ExerciseCard';
 import FooterActions from './components/FooterActions';
 import Toast from './components/Toast';
+import ManageWorkouts from './components/ManageWorkouts';
 
 export default function App() {
-  const [workout, setWorkout] = useState('A');
   const [toast, setToast] = useState({ message: '', isError: false });
-  const [fieldVersion, setFieldVersion] = useState(0); // triggers re-render on input
+  const [fieldVersion, setFieldVersion] = useState(0);
+  const [activeWorkoutId, setActiveWorkoutId] = useState(null);
+  const [screen, setScreen] = useState('tracker');
   const timer = useTimer();
   const sheets = useSheets();
+  const { config, saveConfig } = useConfig();
 
-  const exercises = WORKOUTS[workout];
+  // Initialize activeWorkoutId once config loads
+  useEffect(() => {
+    if (config && !activeWorkoutId) {
+      setActiveWorkoutId(config.workouts[0]?.id ?? null);
+    }
+  }, [config, activeWorkoutId]);
+
+  const activeWorkout = config?.workouts.find((w) => w.id === activeWorkoutId) ?? config?.workouts[0];
+  const workoutColor = activeWorkout?.color ?? 'a';
+  const workoutLabel = activeWorkout?.label ?? '';
+  const exercises = activeWorkout?.exercises ?? [];
 
   const showToast = (message, isError = false) => {
     setToast({ message, isError });
@@ -65,7 +78,7 @@ export default function App() {
     }
 
     try {
-      await sheets.save({ workout, exercises: exercisesData });
+      await sheets.save({ workout: workoutLabel, exercises: exercisesData });
       showToast('Saved to Google Sheets!');
     } catch (err) {
       showToast('Save failed: ' + err.message, true);
@@ -77,7 +90,7 @@ export default function App() {
     const date = new Date().toLocaleDateString('en-GB', {
       day: '2-digit', month: 'short', year: 'numeric',
     });
-    let text = `FBEOD Workout ${workout} — ${date}\nBW: 64.5 kg\n${'─'.repeat(30)}\n`;
+    let text = `FBEOD Workout ${workoutLabel} — ${date}\nBW: 64.5 kg\n${'─'.repeat(30)}\n`;
 
     exercises.forEach((ex) => {
       text += `\n${ex.name}\n`;
@@ -97,15 +110,39 @@ export default function App() {
 
   // --- Clear session ---
   const handleClear = () => {
-    if (!confirm(`Clear all weights/reps for Workout ${workout}?`)) return;
+    if (!confirm(`Clear all weights/reps for Workout ${workoutLabel}?`)) return;
     exercises.forEach((ex) => clearFields(ex.id, ex.sets));
     setFieldVersion((v) => v + 1);
     showToast('Session cleared');
   };
 
+  // --- Manage screen ---
+  const handleManageSave = (newConfig) => {
+    saveConfig(newConfig);
+    // If active workout was deleted, fall back to first
+    const stillExists = newConfig.workouts.find((w) => w.id === activeWorkoutId);
+    if (!stillExists) {
+      setActiveWorkoutId(newConfig.workouts[0]?.id ?? null);
+    }
+    setScreen('tracker');
+    showToast('Workouts saved');
+  };
+
+  if (screen === 'manage' && config) {
+    return (
+      <ManageWorkouts
+        config={config}
+        onSave={handleManageSave}
+        onCancel={() => setScreen('tracker')}
+      />
+    );
+  }
+
+  if (!config) return null;
+
   return (
     <>
-      <Header workout={workout} syncStatus={sheets.status} />
+      <Header workoutColor={workoutColor} workoutLabel={workoutLabel} syncStatus={sheets.status} />
 
       {!sheets.configured && (
         <SetupBanner
@@ -118,7 +155,12 @@ export default function App() {
         />
       )}
 
-      <WorkoutToggle current={workout} onSwitch={setWorkout} />
+      <WorkoutSelector
+        workouts={config.workouts}
+        currentId={activeWorkout?.id}
+        onSelect={setActiveWorkoutId}
+        onManage={() => setScreen('manage')}
+      />
 
       <TimerBar
         display={timer.display}
@@ -126,7 +168,7 @@ export default function App() {
         running={timer.running}
         finished={timer.finished}
         onToggle={timer.toggle}
-        workout={workout}
+        workoutColor={workoutColor}
       />
 
       {exercises.map((ex) => (
@@ -134,13 +176,13 @@ export default function App() {
           key={`${ex.id}-${fieldVersion}`}
           exercise={ex}
           lastLift={sheets.lastLifts[ex.id] || null}
-          workout={workout}
+          workoutColor={workoutColor}
           onFieldChange={handleFieldChange}
         />
       ))}
 
       <FooterActions
-        workout={workout}
+        workoutColor={workoutColor}
         onSave={handleSave}
         onExport={handleExport}
         onClear={handleClear}

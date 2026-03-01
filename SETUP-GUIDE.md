@@ -19,6 +19,7 @@ A separate "LastLifts" sheet tracks the most recent session per exercise for the
 4. Add headers in Row 1: `Date | Workout | Exercise | ExerciseID | Set | Weight | Reps | e1RM | Bodyweight`
 5. Create a second tab named **"LastLifts"**
 6. Add headers in Row 1: `ExerciseID | Exercise | Date | Sets`
+7. Create a third tab named **"Config"** (no headers needed — the script manages this automatically)
 
 ---
 

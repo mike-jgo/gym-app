@@ -3,7 +3,7 @@ import { calc1RM } from '../utils/calc';
 import { saveField, loadField } from '../utils/storage';
 import './ExerciseCard.css';
 
-export default function ExerciseCard({ exercise, lastLift, workout, onFieldChange }) {
+export default function ExerciseCard({ exercise, lastLift, workoutColor, onFieldChange }) {
   const setNumbers = useMemo(
     () => Array.from({ length: exercise.sets }, (_, i) => i + 1),
     [exercise.sets]
@@ -46,7 +46,7 @@ export default function ExerciseCard({ exercise, lastLift, workout, onFieldChang
   }
 
   return (
-    <div className={`exercise-card workout-${workout.toLowerCase()}`}>
+    <div className={`exercise-card workout-${workoutColor}`}>
       <div className="ex-header">
         <div className="ex-name">{exercise.name}</div>
         <div className="ex-1rm mono">

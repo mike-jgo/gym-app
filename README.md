@@ -1,70 +1,52 @@
-# FBEOD Tracker
+# Fitlog
 
-A workout tracker for the Full Body Every Other Day (FBEOD) program, with Google Sheets as a persistent data store.
+A minimal, mobile-first workout tracker. Log sets, track e1RM, and sync to your own Google Sheet.
 
-## Project Structure
+**[Open Fitlog](https://mike-jgo.github.io/gym-app/)**
 
-```
-fbeod-tracker/
-├── index.html                  # Entry HTML
-├── vite.config.js              # Vite config (GitHub Pages compatible)
-├── package.json
-├── src/
-│   ├── main.jsx                # React entry point
-│   ├── App.jsx                 # Main app component
-│   ├── styles/
-│   │   └── global.css          # Design tokens & base styles
-│   ├── components/
-│   │   ├── Header.jsx/.css     # Logo, BW badge, sync indicator
-│   │   ├── SetupBanner.jsx/.css# Google Sheets connection UI
-│   │   ├── WorkoutToggle.jsx/.css # A/B workout switcher
-│   │   ├── TimerBar.jsx/.css   # Rest timer with progress bar
-│   │   ├── ExerciseCard.jsx/.css # Exercise with sets grid & e1RM
-│   │   ├── FooterActions.jsx/.css # Save/Export/Clear buttons
-│   │   └── Toast.jsx/.css      # Notification popup
-│   ├── hooks/
-│   │   ├── useTimer.js         # Rest timer logic
-│   │   └── useSheets.js        # Google Sheets sync state
-│   └── utils/
-│       ├── workouts.js         # Exercise definitions (A & B)
-│       ├── calc.js             # Brzycki 1RM formula
-│       ├── storage.js          # localStorage for current session
-│       └── sheets.js           # Google Sheets API calls
-└── APPS-SCRIPT.js              # Google Apps Script (copy to Sheets)
-```
+---
 
-## Quick Start
+## Using Fitlog
+
+Fitlog runs entirely in your browser — no install needed. Open the link above on any device and it's ready to use.
+
+Your data is stored in your own private Google Sheet, so you'll need to do a one-time setup to enable cloud sync.
+
+---
+
+## Google Sheets Setup
+
+1. Create a blank Google Sheet (name it anything)
+2. Open **Extensions → Apps Script**
+3. Delete any existing code and paste in the contents of [`APPS-SCRIPT.js`](./APPS-SCRIPT.js)
+4. Click **Deploy → New deployment**
+   - Type: **Web app**
+   - Execute as: **Me**
+   - Who has access: **Anyone**
+5. Click **Deploy** and copy the URL
+6. Open Fitlog, paste the URL into the setup banner, and tap **Connect**
+
+All sheet tabs and headers are created automatically on first use.
+
+---
+
+## Running Locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Google Sheets Setup
-
-1. Create a Google Sheet with two tabs: **"Log"** and **"LastLifts"**
-2. In the Sheet, go to **Extensions → Apps Script**
-3. Paste the contents of `APPS-SCRIPT.js`
-4. Deploy as Web App (Execute as: Me, Access: Anyone)
-5. Copy the URL and paste it into the tracker's setup banner
-
-See `SETUP-GUIDE.md` for detailed instructions.
-
-## Deploy to GitHub Pages
+Deploy to GitHub Pages:
 
 ```bash
 npm run deploy
 ```
 
-Or commit the `dist/` folder to your `gh-pages` branch.
+---
 
-## Claude Code Integration
+## Tech
 
-Claude Code can interact with your workout data via the same API:
-
-```bash
-# Fetch all data
-curl "YOUR_APPS_SCRIPT_URL?action=allData"
-
-# Or tell Claude Code your URL and ask it to analyze your progress
-```
+- React + Vite
+- Google Apps Script (personal data backend)
+- No accounts, no third-party servers

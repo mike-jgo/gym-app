@@ -173,10 +173,11 @@ export default function App() {
 
       {exercises.map((ex) => (
         <ExerciseCard
-          key={`${ex.id}-${fieldVersion}`}
+          key={ex.id}
           exercise={ex}
           lastLift={sheets.lastLifts[ex.id] || null}
           workoutColor={workoutColor}
+          fieldVersion={fieldVersion}
           onFieldChange={handleFieldChange}
         />
       ))}

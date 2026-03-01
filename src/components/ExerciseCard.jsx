@@ -3,7 +3,7 @@ import { calc1RM } from '../utils/calc';
 import { saveField, loadField } from '../utils/storage';
 import './ExerciseCard.css';
 
-export default function ExerciseCard({ exercise, lastLift, workoutColor, onFieldChange }) {
+export default function ExerciseCard({ exercise, lastLift, workoutColor, fieldVersion, onFieldChange }) {
   const setNumbers = useMemo(
     () => Array.from({ length: exercise.sets }, (_, i) => i + 1),
     [exercise.sets]
@@ -19,7 +19,7 @@ export default function ExerciseCard({ exercise, lastLift, workoutColor, onField
       if (rm > best) best = rm;
     }
     return best;
-  }, [exercise.id, setNumbers, onFieldChange]); // onFieldChange triggers re-calc
+  }, [exercise.id, setNumbers, fieldVersion]);
 
   const handleInput = (set, field, value) => {
     saveField(exercise.id, set, field, value);

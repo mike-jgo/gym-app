@@ -1,14 +1,13 @@
 // ============================================================
-// FBEOD Google Apps Script
+// Fitlog Google Apps Script
 //
 // SETUP:
-// 1. Create a Google Sheet with tabs "Log", "LastLifts", and "Config"
-//    (The "Sessions" tab is created automatically on first save)
-// 2. Log headers (Row 1): Date | Workout | Exercise | ExerciseID | Set | Weight | Reps | e1RM | Bodyweight
-// 3. LastLifts headers (Row 1): ExerciseID | Exercise | Date | Sets
-// 4. Extensions → Apps Script → paste this code
-// 5. Deploy → New deployment → Web app → Execute as: Me, Access: Anyone
-// 6. Copy the URL into the tracker
+// 1. Create a blank Google Sheet (name it anything)
+// 2. Extensions → Apps Script → paste this code
+// 3. Deploy → New deployment → Web app → Execute as: Me, Access: Anyone
+// 4. Copy the deployment URL into Fitlog
+//
+// All tabs and headers are created automatically on first use.
 // ============================================================
 
 const LOG_SHEET = 'Log';
@@ -16,8 +15,43 @@ const LAST_SHEET = 'LastLifts';
 const CONFIG_SHEET = 'Config';
 const SESSIONS_SHEET = 'Sessions';
 
+// Ensure all required sheets exist with correct headers
+function initSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const required = [
+    {
+      name: LOG_SHEET,
+      headers: ['Date', 'Workout', 'Exercise', 'ExerciseID', 'Set', 'Weight', 'Reps', 'e1RM', 'Bodyweight']
+    },
+    {
+      name: LAST_SHEET,
+      headers: ['ExerciseID', 'Exercise', 'Date', 'Sets']
+    },
+    {
+      name: CONFIG_SHEET,
+      headers: []
+    },
+    {
+      name: SESSIONS_SHEET,
+      headers: ['SessionID', 'Date', 'Workout', 'WorkoutColor', 'Bodyweight', 'Exercises', 'Duration']
+    }
+  ];
+
+  required.forEach(function(def) {
+    var sheet = ss.getSheetByName(def.name);
+    if (!sheet) {
+      sheet = ss.insertSheet(def.name);
+      if (def.headers.length > 0) {
+        sheet.appendRow(def.headers);
+      }
+    }
+  });
+}
+
 // Handle GET requests (fetch data)
 function doGet(e) {
+  initSheets();
   const action = (e && e.parameter && e.parameter.action) || 'lastLifts';
 
   if (action === 'lastLifts') {
@@ -41,6 +75,7 @@ function doGet(e) {
 
 // Handle POST requests (save workout)
 function doPost(e) {
+  initSheets();
   try {
     const body = JSON.parse(e.postData.contents);
 
@@ -96,12 +131,8 @@ function saveWorkout(data) {
     logSheet.getRange(logSheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
   }
 
-  // Append session summary (auto-create Sessions sheet if missing)
+  // Append session summary
   var sessionsSheet = ss.getSheetByName(SESSIONS_SHEET);
-  if (!sessionsSheet) {
-    sessionsSheet = ss.insertSheet(SESSIONS_SHEET);
-    sessionsSheet.appendRow(['SessionID', 'Date', 'Workout', 'WorkoutColor', 'Bodyweight', 'Exercises', 'Duration']);
-  }
   sessionsSheet.appendRow([
     data.date,
     dateStr,

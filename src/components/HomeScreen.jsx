@@ -5,7 +5,7 @@ import './HomeScreen.css';
 export default function HomeScreen({ workouts, onStart, onManage, onHistory, sheetsConfigured, onConnect }) {
   return (
     <div className="home">
-      <h1 className="home-title mono">FBEOD</h1>
+      <h1 className="home-title mono">FITLOG</h1>
       {!sheetsConfigured && <SetupBanner onConnect={onConnect} />}
       <div className="workout-list">
         {workouts.map((w) => (

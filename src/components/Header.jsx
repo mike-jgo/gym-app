@@ -16,7 +16,7 @@ export default function Header({ workoutColor, workoutLabel, syncStatus, bodywei
           <button className="back-btn" onClick={onBack} aria-label="Back to home">←</button>
         )}
         <h1 className="header-title mono">
-          FBEOD <span className={`accent-${workoutColor}`}>{workoutLabel}</span>
+          FITLOG <span className={`accent-${workoutColor}`}>{workoutLabel}</span>
         </h1>
       </div>
       <div className="header-right">

@@ -49,6 +49,20 @@ export async function fetchLastLifts() {
 }
 
 /**
+ * Fetch compact PB data keyed by exercise id
+ */
+export async function fetchPBs() {
+  const url = getApiUrl();
+  if (!url) throw new Error('No API URL configured');
+
+  const response = await fetch(`${url}?action=pbs`);
+  const result = await response.json();
+
+  if (result.status !== 'ok') throw new Error(result.message || 'Fetch failed');
+  return result.data || {};
+}
+
+/**
  * Fetch session history (reverse chronological)
  */
 export async function fetchSessions() {

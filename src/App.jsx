@@ -1,6 +1,13 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { calc1RM } from './utils/calc';
-import { loadField, clearFields, loadBodyweight, saveBodyweight } from './utils/storage';
+import {
+  loadField,
+  clearFields,
+  loadBodyweight,
+  saveBodyweight,
+  loadEffortMode,
+  saveEffortMode,
+} from './utils/storage';
 import { useTimer } from './hooks/useTimer';
 import { useSessionTimer } from './hooks/useSessionTimer';
 import { useSheets } from './hooks/useSheets';
@@ -18,9 +25,57 @@ import FooterActions from './components/FooterActions';
 import Toast from './components/Toast';
 import ManageWorkouts from './components/ManageWorkouts';
 
+const EFFORT_EPSILON = 0.0001;
+
+function isHalfStep(value) {
+  return Math.abs((value * 2) - Math.round(value * 2)) < EFFORT_EPSILON;
+}
+
+function roundEffort(value) {
+  return Math.round(value * 10) / 10;
+}
+
+function parseEffortValue(value) {
+  if (value === '' || value == null) return null;
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeEffort(rpeRaw, rirRaw) {
+  let rpe = parseEffortValue(rpeRaw);
+  let rir = parseEffortValue(rirRaw);
+
+  if (rpe == null && rir == null) {
+    return { rpe: null, rir: null, error: null };
+  }
+
+  if (rpe != null && (rpe < 6 || rpe > 10 || !isHalfStep(rpe))) {
+    return { error: 'RPE must be 6-10 in 0.5 steps' };
+  }
+
+  if (rir != null && (rir < 0 || rir > 4 || !isHalfStep(rir))) {
+    return { error: 'RIR must be 0-4 in 0.5 steps' };
+  }
+
+  if (rpe == null && rir != null) {
+    rpe = 10 - rir;
+  } else if (rir == null && rpe != null) {
+    rir = 10 - rpe;
+  } else if (rpe != null && rir != null) {
+    rir = 10 - rpe;
+  }
+
+  return {
+    rpe: roundEffort(rpe),
+    rir: roundEffort(rir),
+    error: null,
+  };
+}
+
 export default function App() {
   const [toast, setToast] = useState({ message: '', isError: false });
   const [bodyweight, setBodyweight] = useState(() => loadBodyweight());
+  const [effortMode, setEffortMode] = useState(() => loadEffortMode());
   const [fieldVersion, setFieldVersion] = useState(0);
   const [activeWorkoutId, setActiveWorkoutId] = useState(null);
   const [screen, setScreen] = useState('home');
@@ -51,6 +106,11 @@ export default function App() {
 
   const showToast = (message, isError = false) => {
     setToast({ message, isError });
+  };
+
+  const handleEffortModeChange = (mode) => {
+    saveEffortMode(mode);
+    setEffortMode(mode);
   };
 
   const handleFieldChange = useCallback(() => {
@@ -84,26 +144,67 @@ export default function App() {
   // --- Complete session (save + clear + go home) ---
   const handleComplete = async () => {
     const exercisesData = [];
+    let validationError = '';
 
-    exercises.forEach((ex) => {
+    for (const ex of exercises) {
       const sets = [];
       for (let s = 1; s <= ex.sets; s++) {
         const w = loadField(ex.id, s, 'w');
         const r = loadField(ex.id, s, 'r');
+
         if (w || r) {
-          sets.push({ set: s, weight: parseFloat(w) || 0, reps: parseInt(r) || 0 });
+          const effort = normalizeEffort(loadField(ex.id, s, 'rpe'), loadField(ex.id, s, 'rir'));
+          if (effort.error) {
+            validationError = `${ex.name} S${s}: ${effort.error}`;
+            break;
+          }
+
+          const weight = parseFloat(w) || 0;
+          const reps = parseInt(r, 10) || 0;
+          const volumeLoad = Math.round(weight * reps * 10) / 10;
+          const hardSet = effort.rpe != null ? effort.rpe >= 8 : (effort.rir != null && effort.rir <= 2);
+
+          sets.push({
+            set: s,
+            weight,
+            reps,
+            rpe: effort.rpe,
+            rir: effort.rir,
+            volumeLoad,
+            hardSet,
+          });
         }
       }
+      if (validationError) break;
+
       if (sets.length) {
-        const best = Math.max(...sets.map((s) => calc1RM(s.weight, s.reps)));
+        const e1rms = sets.map((set) => calc1RM(set.weight, set.reps));
+        const best = Math.max(...e1rms);
+        const last = e1rms[e1rms.length - 1] || 0;
+        const fatigueDrift = best > 0 ? Math.round((((last - best) / best) * 1000)) / 10 : 0;
+        const totalVolume = Math.round(sets.reduce((sum, set) => sum + set.volumeLoad, 0) * 10) / 10;
+        const hardSets = sets.filter((set) => set.hardSet).length;
+        const rpeSets = sets.filter((set) => set.rpe != null);
+        const avgRPE = rpeSets.length
+          ? Math.round((rpeSets.reduce((sum, set) => sum + set.rpe, 0) / rpeSets.length) * 10) / 10
+          : null;
         exercisesData.push({
           id: ex.id,
           name: ex.name,
           sets,
+          totalVolume,
+          hardSets,
+          avgRPE,
+          fatigueDrift,
           best1RM: Math.round(best * 10) / 10,
         });
       }
-    });
+    }
+
+    if (validationError) {
+      showToast(validationError, true);
+      return;
+    }
 
     if (!exercisesData.length) {
       showToast('Nothing to save — enter some sets first', true);
@@ -143,7 +244,10 @@ export default function App() {
       for (let s = 1; s <= ex.sets; s++) {
         const w = loadField(ex.id, s, 'w');
         const r = loadField(ex.id, s, 'r');
-        if (w || r) text += `  S${s}: ${w || '—'} kg × ${r || '—'} reps\n`;
+        const rpe = loadField(ex.id, s, 'rpe');
+        const rir = loadField(ex.id, s, 'rir');
+        const effortText = rpe ? ` @${rpe}` : (rir ? ` (RIR ${rir})` : '');
+        if (w || r) text += `  S${s}: ${w || '-'} kg x ${r || '-'} reps${effortText}\n`;
       }
     });
 
@@ -247,13 +351,31 @@ export default function App() {
         workoutColor={workoutColor}
       />
 
+      <div className="effort-toggle mono">
+        <span>INPUT</span>
+        <button
+          className={`effort-mode-btn ${effortMode === 'rpe' ? `active accent-${workoutColor}` : ''}`}
+          onClick={() => handleEffortModeChange('rpe')}
+        >
+          RPE
+        </button>
+        <button
+          className={`effort-mode-btn ${effortMode === 'rir' ? `active accent-${workoutColor}` : ''}`}
+          onClick={() => handleEffortModeChange('rir')}
+        >
+          RIR
+        </button>
+      </div>
+
       {exercises.map((ex) => (
         <ExerciseCard
           key={ex.id}
           exercise={ex}
           lastLift={sheets.lastLifts[ex.id] || null}
+          personalBest={sheets.personalBests[ex.id] || null}
           workoutColor={workoutColor}
           fieldVersion={fieldVersion}
+          effortMode={effortMode}
           onFieldChange={handleFieldChange}
         />
       ))}

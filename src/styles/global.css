@@ -63,3 +63,37 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
 }
+
+.effort-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.effort-mode-btn {
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.effort-mode-btn.active {
+  font-weight: 700;
+}
+
+.effort-mode-btn.active.accent-a { border-color: var(--accent-a); color: var(--accent-a); background: var(--accent-a-dim); }
+.effort-mode-btn.active.accent-b { border-color: var(--accent-b); color: var(--accent-b); background: var(--accent-b-dim); }
+.effort-mode-btn.active.accent-c { border-color: var(--accent-c); color: var(--accent-c); background: var(--accent-c-dim); }
+.effort-mode-btn.active.accent-d { border-color: var(--accent-d); color: var(--accent-d); background: var(--accent-d-dim); }
+.effort-mode-btn.active.accent-e { border-color: var(--accent-e); color: var(--accent-e); background: var(--accent-e-dim); }
+.effort-mode-btn.active.accent-f { border-color: var(--accent-f); color: var(--accent-f); background: var(--accent-f-dim); }

@@ -4,8 +4,8 @@
 
 Your workout data will be stored in a Google Sheet with this structure:
 
-| Date | Workout | Exercise | ExerciseID | Set | Weight | Reps | e1RM | Bodyweight |
-|------|---------|----------|------------|-----|--------|------|------|------------|
+| Date | Workout | Exercise | ExerciseID | Set | Weight | Reps | e1RM | Bodyweight | RPE | RIR | VolumeLoad | HardSet |
+|------|---------|----------|------------|-----|--------|------|------|------------|-----|-----|------------|---------|
 
 A separate "LastLifts" sheet tracks the most recent session per exercise for the "LAST" display in the tracker.
 
@@ -16,7 +16,7 @@ A separate "LastLifts" sheet tracks the most recent session per exercise for the
 1. Go to [Google Sheets](https://sheets.google.com) and create a new spreadsheet
 2. Name it **"FBEOD Tracker"**
 3. Rename the first tab to **"Log"**
-4. Add headers in Row 1: `Date | Workout | Exercise | ExerciseID | Set | Weight | Reps | e1RM | Bodyweight`
+4. Add headers in Row 1: `Date | Workout | Exercise | ExerciseID | Set | Weight | Reps | e1RM | Bodyweight | RPE | RIR | VolumeLoad | HardSet`
 5. Create a second tab named **"LastLifts"**
 6. Add headers in Row 1: `ExerciseID | Exercise | Date | Sets`
 7. Create a third tab named **"Config"** (no headers needed — the script manages this automatically)
@@ -111,7 +111,7 @@ function updateLastLift(sheet, exId, exName, dateStr, sets) {
   }
 
   const setsJson = JSON.stringify(sets.map(function(s) {
-    return { w: s.weight, r: s.reps };
+    return { w: s.weight, r: s.reps, rpe: s.rpe, rir: s.rir };
   }));
 
   if (foundRow > 0) {

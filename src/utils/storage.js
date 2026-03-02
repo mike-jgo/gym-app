@@ -16,6 +16,8 @@ export function clearFields(exId, sets) {
   for (let s = 1; s <= sets; s++) {
     localStorage.removeItem(fieldKey(exId, s, 'w'));
     localStorage.removeItem(fieldKey(exId, s, 'r'));
+    localStorage.removeItem(fieldKey(exId, s, 'rpe'));
+    localStorage.removeItem(fieldKey(exId, s, 'rir'));
   }
 }
 
@@ -25,4 +27,13 @@ export function loadBodyweight() {
 }
 export function saveBodyweight(value) {
   localStorage.setItem(BW_KEY, String(value));
+}
+
+const EFFORT_MODE_KEY = 'fbeod_effort_mode';
+export function loadEffortMode() {
+  const mode = localStorage.getItem(EFFORT_MODE_KEY);
+  return mode === 'rir' ? 'rir' : 'rpe';
+}
+export function saveEffortMode(mode) {
+  localStorage.setItem(EFFORT_MODE_KEY, mode === 'rir' ? 'rir' : 'rpe');
 }

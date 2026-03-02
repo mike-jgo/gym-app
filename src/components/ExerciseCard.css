@@ -68,9 +68,33 @@
   margin-left: 6px;
 }
 
+.pb-lift {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  background: var(--surface2);
+  border-radius: 8px;
+}
+
+.pb-lift em {
+  font-style: normal;
+  color: var(--yellow);
+}
+
+.pb-date {
+  opacity: 0.5;
+  margin-left: 6px;
+}
+
+.pb-sep {
+  opacity: 0.5;
+  margin: 0 8px;
+}
+
 .sets-grid {
   display: grid;
-  grid-template-columns: auto 1fr 1fr;
+  grid-template-columns: auto 1fr 1fr 1fr;
   gap: 8px;
   align-items: center;
 }
@@ -135,4 +159,8 @@
   color: var(--text-dim);
   font-weight: 400;
   font-size: 0.8rem;
+}
+
+.set-input-effort {
+  font-size: 1rem;
 }

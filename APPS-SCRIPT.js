@@ -14,6 +14,21 @@ const LOG_SHEET = 'Log';
 const LAST_SHEET = 'LastLifts';
 const CONFIG_SHEET = 'Config';
 const SESSIONS_SHEET = 'Sessions';
+const PB_SHEET = 'PBs';
+const LOG_HEADERS = [
+  'Date', 'Workout', 'Exercise', 'ExerciseID', 'Set', 'Weight', 'Reps', 'e1RM', 'Bodyweight',
+  'RPE', 'RIR', 'VolumeLoad', 'HardSet'
+];
+const LAST_HEADERS = ['ExerciseID', 'Exercise', 'Date', 'Sets'];
+const SESSION_HEADERS = [
+  'SessionID', 'Date', 'Workout', 'WorkoutColor', 'Bodyweight', 'Exercises', 'Duration',
+  'TotalVolume', 'HardSets', 'AvgRPE'
+];
+const PB_HEADERS = [
+  'ExerciseID', 'Exercise', 'Best1RM', 'Best1RMDate',
+  'BestWeight', 'BestWeightReps', 'BestWeightDate',
+  'BestVolume', 'BestVolumeDate'
+];
 
 // Ensure all required sheets exist with correct headers
 function initSheets() {
@@ -22,11 +37,11 @@ function initSheets() {
   const required = [
     {
       name: LOG_SHEET,
-      headers: ['Date', 'Workout', 'Exercise', 'ExerciseID', 'Set', 'Weight', 'Reps', 'e1RM', 'Bodyweight']
+      headers: LOG_HEADERS
     },
     {
       name: LAST_SHEET,
-      headers: ['ExerciseID', 'Exercise', 'Date', 'Sets']
+      headers: LAST_HEADERS
     },
     {
       name: CONFIG_SHEET,
@@ -34,7 +49,11 @@ function initSheets() {
     },
     {
       name: SESSIONS_SHEET,
-      headers: ['SessionID', 'Date', 'Workout', 'WorkoutColor', 'Bodyweight', 'Exercises', 'Duration']
+      headers: SESSION_HEADERS
+    },
+    {
+      name: PB_SHEET,
+      headers: PB_HEADERS
     }
   ];
 
@@ -45,6 +64,8 @@ function initSheets() {
       if (def.headers.length > 0) {
         sheet.appendRow(def.headers);
       }
+    } else if (def.headers.length > 0) {
+      ensureHeaders(sheet, def.headers);
     }
   });
 }
@@ -64,6 +85,10 @@ function doGet(e) {
 
   if (action === 'allData') {
     return sendJson(getAllData());
+  }
+
+  if (action === 'pbs') {
+    return sendJson(getPBs());
   }
 
   if (action === 'getConfig') {
@@ -98,6 +123,9 @@ function saveWorkout(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const logSheet = ss.getSheetByName(LOG_SHEET);
   const lastSheet = ss.getSheetByName(LAST_SHEET);
+  const sessionsSheet = ss.getSheetByName(SESSIONS_SHEET);
+  const pbSheet = ss.getSheetByName(PB_SHEET);
+  const logHeaders = getSheetHeaders(logSheet);
 
   const date = new Date(data.date);
   const dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'dd MMM yyyy');
@@ -105,34 +133,54 @@ function saveWorkout(data) {
   const workoutColor = data.workoutColor || '';
   const bodyweight = data.bodyweight;
 
+  var sessionVolume = 0;
+  var sessionHardSets = 0;
+  var sessionRpeTotal = 0;
+  var sessionRpeCount = 0;
   const rows = [];
 
   data.exercises.forEach(function(ex) {
     ex.sets.forEach(function(s) {
       const e1rm = calc1RM(s.weight, s.reps);
-      rows.push([
-        dateStr,
-        workout,
-        ex.name,
-        ex.id,
-        s.set,
-        s.weight,
-        s.reps,
-        Math.round(e1rm * 10) / 10,
-        bodyweight
-      ]);
+      const effort = normalizeEffort(s.rpe, s.rir);
+      const volumeLoad = Math.round((s.weight || 0) * (s.reps || 0) * 10) / 10;
+      const hardSet = effort.rpe != null ? effort.rpe >= 8 : (effort.rir != null && effort.rir <= 2);
+
+      sessionVolume += volumeLoad;
+      if (hardSet) sessionHardSets += 1;
+      if (effort.rpe != null) {
+        sessionRpeTotal += effort.rpe;
+        sessionRpeCount += 1;
+      }
+
+      rows.push(buildLogRow(logHeaders, {
+        Date: dateStr,
+        Workout: workout,
+        Exercise: ex.name,
+        ExerciseID: ex.id,
+        Set: s.set,
+        Weight: s.weight,
+        Reps: s.reps,
+        e1RM: Math.round(e1rm * 10) / 10,
+        Bodyweight: bodyweight,
+        RPE: effort.rpe,
+        RIR: effort.rir,
+        VolumeLoad: volumeLoad,
+        HardSet: hardSet ? 1 : 0
+      }));
     });
 
-    // Update LastLifts
-    updateLastLift(lastSheet, ex.id, ex.name, dateStr, ex.sets);
   });
 
   if (rows.length > 0) {
     logSheet.getRange(logSheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
   }
 
+  upsertLastLifts(lastSheet, dateStr, data.exercises);
+  upsertPersonalBests(pbSheet, dateStr, data.exercises);
+
   // Append session summary
-  var sessionsSheet = ss.getSheetByName(SESSIONS_SHEET);
+  var avgRpe = sessionRpeCount > 0 ? Math.round((sessionRpeTotal / sessionRpeCount) * 10) / 10 : '';
   sessionsSheet.appendRow([
     data.date,
     dateStr,
@@ -140,32 +188,185 @@ function saveWorkout(data) {
     workoutColor,
     bodyweight,
     JSON.stringify(data.exercises),
-    data.duration || 0
+    data.duration || 0,
+    Math.round(sessionVolume * 10) / 10,
+    sessionHardSets,
+    avgRpe
   ]);
 
   return { status: 'ok', rowsSaved: rows.length };
 }
 
-// Update the LastLifts sheet for a given exercise
-function updateLastLift(sheet, exId, exName, dateStr, sets) {
-  const data = sheet.getDataRange().getValues();
-  let foundRow = -1;
-
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === exId) {
-      foundRow = i + 1;
-      break;
-    }
+function ensureHeaders(sheet, headers) {
+  var width = Math.max(sheet.getLastColumn(), headers.length);
+  if (width === 0) {
+    sheet.appendRow(headers);
+    return;
   }
 
-  const setsJson = JSON.stringify(sets.map(function(s) {
-    return { w: s.weight, r: s.reps };
-  }));
+  var existing = sheet.getRange(1, 1, 1, width).getValues()[0];
+  var missing = [];
+  headers.forEach(function(h) {
+    if (existing.indexOf(h) === -1) missing.push(h);
+  });
 
-  if (foundRow > 0) {
-    sheet.getRange(foundRow, 2, 1, 3).setValues([[exName, dateStr, setsJson]]);
-  } else {
-    sheet.appendRow([exId, exName, dateStr, setsJson]);
+  if (missing.length > 0) {
+    var startCol = sheet.getLastColumn() + 1;
+    sheet.getRange(1, startCol, 1, missing.length).setValues([missing]);
+  }
+}
+
+function getSheetHeaders(sheet) {
+  if (sheet.getLastColumn() === 0) return [];
+  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+}
+
+function buildLogRow(headers, valuesByHeader) {
+  return headers.map(function(h) {
+    return valuesByHeader[h] != null ? valuesByHeader[h] : '';
+  });
+}
+
+function normalizeEffort(rpeRaw, rirRaw) {
+  var rpe = parseEffort(rpeRaw);
+  var rir = parseEffort(rirRaw);
+
+  if (rpe == null && rir == null) return { rpe: null, rir: null };
+  if (rpe == null && rir != null) rpe = 10 - rir;
+  if (rir == null && rpe != null) rir = 10 - rpe;
+  if (rpe != null && rir != null) rir = 10 - rpe;
+
+  return { rpe: round1(rpe), rir: round1(rir) };
+}
+
+function parseEffort(v) {
+  if (v === '' || v == null) return null;
+  var n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
+function round1(n) {
+  return Math.round(n * 10) / 10;
+}
+
+function upsertLastLifts(sheet, dateStr, exercises) {
+  const data = sheet.getDataRange().getValues();
+  const rowByExercise = {};
+
+  for (var i = 1; i < data.length; i++) {
+    rowByExercise[data[i][0]] = i + 1;
+  }
+
+  var toAppend = [];
+  exercises.forEach(function(ex) {
+    var setsJson = JSON.stringify((ex.sets || []).map(function(s) {
+      var effort = normalizeEffort(s.rpe, s.rir);
+      return { w: s.weight, r: s.reps, rpe: effort.rpe, rir: effort.rir };
+    }));
+    var row = rowByExercise[ex.id];
+    if (row) {
+      sheet.getRange(row, 2, 1, 3).setValues([[ex.name, dateStr, setsJson]]);
+    } else {
+      toAppend.push([ex.id, ex.name, dateStr, setsJson]);
+    }
+  });
+
+  if (toAppend.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, toAppend.length, toAppend[0].length).setValues(toAppend);
+  }
+}
+
+function upsertPersonalBests(sheet, dateStr, exercises) {
+  const data = sheet.getDataRange().getValues();
+  const existing = {};
+
+  for (var i = 1; i < data.length; i++) {
+    var exId = String(data[i][0] || '');
+    if (!exId) continue;
+    existing[exId] = {
+      row: i + 1,
+      exercise: data[i][1] || '',
+      best1RM: Number(data[i][2]) || 0,
+      best1RMDate: data[i][3] || '',
+      bestWeight: Number(data[i][4]) || 0,
+      bestWeightReps: Number(data[i][5]) || 0,
+      bestWeightDate: data[i][6] || '',
+      bestVolume: Number(data[i][7]) || 0,
+      bestVolumeDate: data[i][8] || ''
+    };
+  }
+
+  var toAppend = [];
+  exercises.forEach(function(ex) {
+    var sets = ex.sets || [];
+    if (sets.length === 0) return;
+
+    var exBest1RM = 0;
+    var exBestWeight = 0;
+    var exBestWeightReps = 0;
+    var exBestVolume = 0;
+
+    sets.forEach(function(s) {
+      var w = Number(s.weight) || 0;
+      var r = Number(s.reps) || 0;
+      var rm = calc1RM(w, r);
+      var vol = round1(w * r);
+      if (rm > exBest1RM) exBest1RM = rm;
+      if (w > exBestWeight) {
+        exBestWeight = w;
+        exBestWeightReps = r;
+      }
+      if (vol > exBestVolume) exBestVolume = vol;
+    });
+
+    var curr = existing[ex.id] || {
+      row: 0,
+      exercise: ex.name,
+      best1RM: 0,
+      best1RMDate: '',
+      bestWeight: 0,
+      bestWeightReps: 0,
+      bestWeightDate: '',
+      bestVolume: 0,
+      bestVolumeDate: ''
+    };
+
+    curr.exercise = ex.name;
+    if (exBest1RM > curr.best1RM) {
+      curr.best1RM = round1(exBest1RM);
+      curr.best1RMDate = dateStr;
+    }
+    if (exBestWeight > curr.bestWeight) {
+      curr.bestWeight = exBestWeight;
+      curr.bestWeightReps = exBestWeightReps;
+      curr.bestWeightDate = dateStr;
+    }
+    if (exBestVolume > curr.bestVolume) {
+      curr.bestVolume = round1(exBestVolume);
+      curr.bestVolumeDate = dateStr;
+    }
+
+    var rowValues = [
+      ex.id,
+      curr.exercise,
+      curr.best1RM,
+      curr.best1RMDate,
+      curr.bestWeight,
+      curr.bestWeightReps,
+      curr.bestWeightDate,
+      curr.bestVolume,
+      curr.bestVolumeDate
+    ];
+
+    if (curr.row > 0) {
+      sheet.getRange(curr.row, 1, 1, rowValues.length).setValues([rowValues]);
+    } else {
+      toAppend.push(rowValues);
+    }
+  });
+
+  if (toAppend.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, toAppend.length, toAppend[0].length).setValues(toAppend);
   }
 }
 
@@ -198,20 +399,33 @@ function getSessions() {
 
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return { status: 'ok', data: [] };
+  const headers = data[0];
+  const idx = {};
+  headers.forEach(function(h, i) { idx[h] = i; });
 
   var result = [];
   for (var i = data.length - 1; i >= 1; i--) {
+    var row = data[i];
     var exercises = [];
-    try { exercises = JSON.parse(data[i][5]); } catch(e) {}
-    var sessionId = data[i][0] instanceof Date ? data[i][0].toISOString() : String(data[i][0]);
+    var exercisesRaw = row[idx.Exercises != null ? idx.Exercises : 5];
+    try { exercises = JSON.parse(exercisesRaw); } catch(e) {}
+    var sessionRaw = row[idx.SessionID != null ? idx.SessionID : 0];
+    var sessionId = sessionRaw instanceof Date ? sessionRaw.toISOString() : String(sessionRaw);
+    var duration = parseInt(row[idx.Duration != null ? idx.Duration : 6], 10) || 0;
+    var totalVolume = Number(row[idx.TotalVolume != null ? idx.TotalVolume : 7]) || 0;
+    var hardSets = parseInt(row[idx.HardSets != null ? idx.HardSets : 8], 10) || 0;
+    var avgRpe = parseEffort(row[idx.AvgRPE != null ? idx.AvgRPE : 9]);
     result.push({
       id: sessionId,
-      date: formatDateVal(data[i][0], 'yyyy-MM-dd HH:mm:ss'),
-      workout: data[i][2],
-      workoutColor: data[i][3],
-      bodyweight: data[i][4],
+      date: formatDateVal(sessionRaw, 'yyyy-MM-dd HH:mm:ss'),
+      workout: row[idx.Workout != null ? idx.Workout : 2],
+      workoutColor: row[idx.WorkoutColor != null ? idx.WorkoutColor : 3],
+      bodyweight: row[idx.Bodyweight != null ? idx.Bodyweight : 4],
       exercises: exercises,
-      duration: parseInt(data[i][6]) || 0
+      duration: duration,
+      totalVolume: totalVolume,
+      hardSets: hardSets,
+      avgRPE: avgRpe
     });
   }
 
@@ -235,6 +449,34 @@ function getAllData() {
   }
 
   return { status: 'ok', data: rows, count: rows.length };
+}
+
+// Get compact PB payload keyed by ExerciseID
+function getPBs() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(PB_SHEET);
+  if (!sheet) return { status: 'ok', data: {} };
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { status: 'ok', data: {} };
+
+  var result = {};
+  for (var i = 1; i < data.length; i++) {
+    var exId = String(data[i][0] || '');
+    if (!exId) continue;
+    result[exId] = {
+      exercise: data[i][1] || '',
+      best1RM: Number(data[i][2]) || 0,
+      best1RMDate: formatDateVal(data[i][3], 'yyyy-MM-dd'),
+      bestWeight: Number(data[i][4]) || 0,
+      bestWeightReps: Number(data[i][5]) || 0,
+      bestWeightDate: formatDateVal(data[i][6], 'yyyy-MM-dd'),
+      bestVolume: Number(data[i][7]) || 0,
+      bestVolumeDate: formatDateVal(data[i][8], 'yyyy-MM-dd')
+    };
+  }
+
+  return { status: 'ok', data: result };
 }
 
 // Get config from Config sheet

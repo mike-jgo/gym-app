@@ -47,7 +47,9 @@ export default function HistoryScreen({ onBack, onFetch }) {
                   <div className="session-sets">
                     {ex.sets.map((s) => (
                       <span key={s.set} className="session-set mono">
-                        {s.weight}×{s.reps}
+                        {s.weight}x{s.reps}
+                        {Number.isFinite(parseFloat(s.rpe)) && ` @${parseFloat(s.rpe)}`}
+                        {Number.isFinite(parseFloat(s.rir)) && ` (RIR ${parseFloat(s.rir)})`}
                       </span>
                     ))}
                   </div>

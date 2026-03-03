@@ -2,7 +2,7 @@ import React from 'react';
 import SetupBanner from './SetupBanner';
 import './HomeScreen.css';
 
-export default function HomeScreen({ workouts, onStart, onManage, onHistory, sheetsConfigured, onConnect }) {
+export default function HomeScreen({ workouts, onStart, onManage, onHistory, onStats, sheetsConfigured, onConnect }) {
   return (
     <div className="home">
       <h1 className="home-title mono">FITLOG</h1>
@@ -20,6 +20,9 @@ export default function HomeScreen({ workouts, onStart, onManage, onHistory, she
       <div className="home-footer-btns">
         <button className="manage-routines-btn mono" onClick={onManage}>
           MANAGE ROUTINES
+        </button>
+        <button className="history-btn mono" onClick={onStats}>
+          VIEW STATS
         </button>
         <button className="history-btn mono" onClick={onHistory}>
           VIEW HISTORY

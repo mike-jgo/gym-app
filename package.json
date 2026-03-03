@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "node --test src/utils/stats.test.js",
     "preview": "vite preview",
     "deploy": "vite build && gh-pages -d dist"
   },

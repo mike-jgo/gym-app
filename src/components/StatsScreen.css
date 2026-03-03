@@ -1,0 +1,231 @@
+.stats-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 16px;
+  padding-bottom: 20px;
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.stats-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.stats-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  width: 100%;
+}
+
+.range-pills {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.range-pill {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface2);
+  color: var(--text-dim);
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.range-pill.active {
+  color: var(--text);
+  border-color: var(--accent-b);
+  background: var(--accent-b-dim);
+}
+
+.exercise-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exercise-filter label {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+}
+
+.exercise-filter select {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.stats-status {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.stats-loading {
+  animation: pulse 1.2s ease infinite;
+}
+
+.stats-error-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stats-error {
+  color: var(--red);
+}
+
+.stats-retry {
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 0.72rem;
+}
+
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.summary-label {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+.chart-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.chart-card-header h2 {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.chart-wrap {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart-svg-line {
+  aspect-ratio: 680 / 220;
+}
+
+.chart-svg-barline {
+  aspect-ratio: 680 / 240;
+}
+
+.chart-axis {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.chart-line {
+  stroke-width: 2.5;
+}
+
+.chart-line-default {
+  stroke: var(--accent-a);
+}
+
+.chart-line-strength {
+  stroke: var(--accent-b);
+}
+
+.chart-line-hardsets {
+  stroke: var(--accent-e);
+}
+
+.chart-point {
+  fill: var(--accent-b);
+}
+
+.chart-point-hardsets {
+  fill: var(--accent-e);
+}
+
+.chart-bar {
+  fill: var(--accent-b-dim);
+  stroke: var(--accent-b);
+  stroke-width: 1;
+}
+
+.chart-y-label {
+  fill: var(--text-dim);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.chart-x-label {
+  fill: var(--text-dim);
+  font-size: 10px;
+}
+
+.chart-empty {
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+@media (max-width: 420px) {
+  .stats-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 900px) {
+  .stats-summary {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+}

@@ -19,6 +19,7 @@ import { fetchSessions } from './utils/sheets';
 import Header from './components/Header';
 import HomeScreen from './components/HomeScreen';
 import HistoryScreen from './components/HistoryScreen';
+import StatsScreen from './components/StatsScreen';
 import TimerBar from './components/TimerBar';
 import ExerciseCard from './components/ExerciseCard';
 import FooterActions from './components/FooterActions';
@@ -305,6 +306,22 @@ export default function App() {
     );
   }
 
+  if (screen === 'stats') {
+    return (
+      <>
+        <StatsScreen
+          onBack={() => setScreen('home')}
+          onFetch={fetchSessions}
+        />
+        <Toast
+          message={toast.message}
+          isError={toast.isError}
+          onDone={() => setToast({ message: '', isError: false })}
+        />
+      </>
+    );
+  }
+
   if (screen === 'home') {
     return (
       <>
@@ -313,6 +330,7 @@ export default function App() {
           onStart={handleStartSession}
           onManage={() => setScreen('manage')}
           onHistory={() => setScreen('history')}
+          onStats={() => setScreen('stats')}
           sheetsConfigured={sheets.configured}
           onConnect={async (url) => {
             const ok = await sheets.connect(url);

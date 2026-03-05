@@ -112,6 +112,10 @@ function doPost(e) {
       return sendJson(saveConfig(body));
     }
 
+    if (body.action === 'fixDuplicates') {
+      return sendJson(fixDuplicateExercises());
+    }
+
     return sendJson({ status: 'error', message: 'Unknown action' });
   } catch (err) {
     return sendJson({ status: 'error', message: err.toString() });
@@ -544,4 +548,115 @@ function sendJson(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * One-time fix: merge duplicate exercise IDs across all sheets.
+ * Run from Script Editor → select fixDuplicateExercises → Run.
+ * Picks the shorter/simpler ID as canonical, remaps everything else to it.
+ */
+function fixDuplicateExercises() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const logSheet    = ss.getSheetByName(LOG_SHEET);
+  const lastSheet   = ss.getSheetByName(LAST_SHEET);
+  const pbSheet     = ss.getSheetByName(PB_SHEET);
+  const sessSheet   = ss.getSheetByName(SESSIONS_SHEET);
+
+  // 1. Scan Log to find name → [ids]
+  const logData = logSheet.getDataRange().getValues();
+  const headers = logData[0];
+  const nameCol = headers.indexOf('Exercise');
+  const idCol   = headers.indexOf('ExerciseID');
+
+  const nameToIds = {};
+  for (var i = 1; i < logData.length; i++) {
+    var name = String(logData[i][nameCol] || '').trim();
+    var id   = String(logData[i][idCol]   || '').trim();
+    if (!name || !id) continue;
+    if (!nameToIds[name]) nameToIds[name] = {};
+    nameToIds[name][id] = true;
+  }
+
+  // 2. Build remap: dupId → canonicalId (shorter = canonical)
+  const idRemap = {};
+  Object.keys(nameToIds).forEach(function(name) {
+    var ids = Object.keys(nameToIds[name]);
+    if (ids.length <= 1) return;
+    ids.sort(function(a, b) { return a.length - b.length; });
+    var canonical = ids[0];
+    ids.slice(1).forEach(function(dupId) {
+      idRemap[dupId] = canonical;
+      Logger.log('Remap: ' + dupId + ' → ' + canonical + ' (' + name + ')');
+    });
+  });
+
+  if (Object.keys(idRemap).length === 0) {
+    Logger.log('No duplicates found.');
+    return { status: 'ok', message: 'No duplicates found' };
+  }
+
+  // 3. Fix Log sheet
+  var logFixed = 0;
+  for (var i = 1; i < logData.length; i++) {
+    var id = String(logData[i][idCol] || '');
+    if (idRemap[id]) {
+      logSheet.getRange(i + 1, idCol + 1).setValue(idRemap[id]);
+      logFixed++;
+    }
+  }
+
+  // 4. Fix LastLifts — remove duplicate rows
+  var lastData = lastSheet.getDataRange().getValues();
+  for (var i = lastData.length - 1; i >= 1; i--) {
+    if (idRemap[String(lastData[i][0] || '')]) lastSheet.deleteRow(i + 1);
+  }
+
+  // 5. Fix PBs — merge best values into canonical, delete duplicate
+  var pbData = pbSheet.getDataRange().getValues();
+  var canonPBRow = {};
+  for (var i = 1; i < pbData.length; i++) {
+    var id = String(pbData[i][0] || '');
+    if (!idRemap[id]) canonPBRow[id] = i + 1;
+  }
+  for (var i = pbData.length - 1; i >= 1; i--) {
+    var dupId = String(pbData[i][0] || '');
+    if (!idRemap[dupId]) continue;
+    var canonRow = canonPBRow[idRemap[dupId]];
+    if (canonRow) {
+      var can = pbSheet.getRange(canonRow, 1, 1, 9).getValues()[0];
+      var dup = pbData[i];
+      if (Number(dup[2]) > Number(can[2])) { can[2] = dup[2]; can[3] = dup[3]; }
+      if (Number(dup[4]) > Number(can[4])) { can[4] = dup[4]; can[5] = dup[5]; can[6] = dup[6]; }
+      if (Number(dup[7]) > Number(can[7])) { can[7] = dup[7]; can[8] = dup[8]; }
+      pbSheet.getRange(canonRow, 1, 1, 9).setValues([can]);
+    }
+    pbSheet.deleteRow(i + 1);
+  }
+
+  // 6. Fix Sessions — remap IDs inside stored JSON
+  var sessData = sessSheet.getDataRange().getValues();
+  var exCol = sessData[0].indexOf('Exercises');
+  var sessFixed = 0;
+  for (var i = 1; i < sessData.length; i++) {
+    var exercises;
+    try { exercises = JSON.parse(sessData[i][exCol]); } catch(e) { continue; }
+    var changed = false;
+    exercises.forEach(function(ex) {
+      if (idRemap[ex.id]) { ex.id = idRemap[ex.id]; changed = true; }
+    });
+    if (changed) {
+      sessSheet.getRange(i + 1, exCol + 1).setValue(JSON.stringify(exercises));
+      sessFixed++;
+    }
+  }
+
+  var result = {
+    status: 'ok',
+    duplicatesFound: Object.keys(idRemap).length,
+    logRowsFixed: logFixed,
+    sessionsFixed: sessFixed,
+    idRemap: idRemap
+  };
+  Logger.log(JSON.stringify(result));
+  return result;
 }

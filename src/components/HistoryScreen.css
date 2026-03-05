@@ -18,6 +18,34 @@
   letter-spacing: -0.5px;
 }
 
+.history-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  width: fit-content;
+  margin-bottom: 4px;
+}
+
+.history-tab {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.history-tab.active {
+  background: var(--surface2);
+  color: var(--text);
+}
+
 .history-status {
   color: var(--text-dim);
   font-size: 0.9rem;

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './Header.css';
 
-export default function Header({ workoutColor, workoutLabel, syncStatus, bodyweight, onBodyweightChange, onBack, sessionElapsed }) {
+export default function Header({ workoutColor, workoutLabel, syncStatus, bodyweight, onBodyweightChange, onBack, sessionElapsed, onEditToggle, editMode }) {
   const [editing, setEditing] = useState(false);
 
   const commit = (e) => {
@@ -18,6 +18,12 @@ export default function Header({ workoutColor, workoutLabel, syncStatus, bodywei
         <h1 className="header-title mono">
           FITLOG <span className={`accent-${workoutColor}`}>{workoutLabel}</span>
         </h1>
+        {onEditToggle && (
+          <button
+            className={`edit-session-btn mono${editMode ? ' active' : ''}`}
+            onClick={onEditToggle}
+          >{editMode ? 'DONE' : 'EDIT'}</button>
+        )}
       </div>
       <div className="header-right">
         {sessionElapsed && <span className="session-elapsed mono">{sessionElapsed}</span>}

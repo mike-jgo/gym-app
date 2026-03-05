@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { calc1RM } from './utils/calc';
+import { generateExerciseId } from './utils/config';
 import {
   loadField,
   clearFields,
@@ -80,6 +81,8 @@ export default function App() {
   const [activeWorkoutId, setActiveWorkoutId] = useState(null);
   const [screen, setScreen] = useState('home');
   const [saving, setSaving] = useState(false);
+  const [sessionExercises, setSessionExercises] = useState(null);
+  const [editMode, setEditMode] = useState(false);
   const timer = useTimer();
   const sessionTimer = useSessionTimer();
   const sheets = useSheets();
@@ -95,7 +98,7 @@ export default function App() {
   const activeWorkout = config?.workouts.find((w) => w.id === activeWorkoutId) ?? config?.workouts[0];
   const workoutColor = activeWorkout?.color ?? 'a';
   const workoutLabel = activeWorkout?.label ?? '';
-  const exercises = activeWorkout?.exercises ?? [];
+  const exercises = sessionExercises ?? activeWorkout?.exercises ?? [];
 
   const handleBodyweightChange = (val) => {
     const n = parseFloat(val);
@@ -137,8 +140,48 @@ export default function App() {
   // --- Start a session ---
   const handleStartSession = (workoutId) => {
     setActiveWorkoutId(workoutId);
+    setSessionExercises(null);
+    setEditMode(false);
     sessionTimer.start();
     setScreen('session');
+  };
+
+  // --- Inline session editing ---
+  const handleEditToggle = () => {
+    if (!editMode && !sessionExercises) {
+      setSessionExercises(JSON.parse(JSON.stringify(exercises)));
+    }
+    setEditMode((v) => !v);
+  };
+
+  const removeExerciseFromSession = (exId) => {
+    setSessionExercises((prev) => prev.filter((e) => e.id !== exId));
+  };
+
+  const updateSessionExerciseSets = (exId, delta) => {
+    setSessionExercises((prev) =>
+      prev.map((e) => e.id === exId ? { ...e, sets: Math.max(1, Math.min(10, e.sets + delta)) } : e)
+    );
+  };
+
+  const addExerciseToSession = () => {
+    const name = prompt('Exercise name:');
+    if (!name?.trim()) return;
+    const id = generateExerciseId(name.trim());
+    setSessionExercises((prev) => [...prev, { id, name: name.trim(), sets: 3 }]);
+  };
+
+  const handleSaveToRoutine = () => {
+    const newConfig = {
+      ...config,
+      workouts: config.workouts.map((w) =>
+        w.id === activeWorkoutId ? { ...w, exercises: sessionExercises } : w
+      ),
+    };
+    saveConfig(newConfig);
+    setSessionExercises(null);
+    setEditMode(false);
+    showToast('Routine saved');
   };
 
   // --- Complete session (save + clear + go home) ---
@@ -340,6 +383,8 @@ export default function App() {
         onBodyweightChange={handleBodyweightChange}
         onBack={handleBack}
         sessionElapsed={formatElapsed(sessionTimer.elapsed)}
+        onEditToggle={handleEditToggle}
+        editMode={editMode}
       />
 
       <TimerBar
@@ -368,17 +413,54 @@ export default function App() {
       </div>
 
       {exercises.map((ex) => (
-        <ExerciseCard
-          key={ex.id}
-          exercise={ex}
-          lastLift={sheets.lastLifts[ex.id] || null}
-          personalBest={sheets.personalBests[ex.id] || null}
-          workoutColor={workoutColor}
-          fieldVersion={fieldVersion}
-          effortMode={effortMode}
-          onFieldChange={handleFieldChange}
-        />
+        <React.Fragment key={ex.id}>
+          {editMode && (
+            <div className="session-ex-edit">
+              <span className="session-ex-edit-name">{ex.name}</span>
+              <div className="session-ex-edit-actions">
+                <button
+                  className="session-stepper"
+                  onClick={() => updateSessionExerciseSets(ex.id, -1)}
+                  disabled={ex.sets <= 1}
+                >−</button>
+                <span className="session-sets-val mono">{ex.sets} sets</span>
+                <button
+                  className="session-stepper"
+                  onClick={() => updateSessionExerciseSets(ex.id, 1)}
+                  disabled={ex.sets >= 10}
+                >+</button>
+                <button
+                  className="session-remove-btn"
+                  onClick={() => removeExerciseFromSession(ex.id)}
+                >✕</button>
+              </div>
+            </div>
+          )}
+          <ExerciseCard
+            exercise={ex}
+            lastLift={sheets.lastLifts[ex.id] || null}
+            personalBest={sheets.personalBests[ex.id] || null}
+            workoutColor={workoutColor}
+            fieldVersion={fieldVersion}
+            effortMode={effortMode}
+            onFieldChange={handleFieldChange}
+          />
+        </React.Fragment>
       ))}
+
+      {editMode && (
+        <div className="session-edit-footer">
+          <button className="session-add-btn" onClick={addExerciseToSession}>
+            + ADD EXERCISE
+          </button>
+          <button
+            className={`session-save-routine-btn accent-${workoutColor}`}
+            onClick={handleSaveToRoutine}
+          >
+            SAVE TO ROUTINE
+          </button>
+        </div>
+      )}
 
       <FooterActions
         workoutColor={workoutColor}
@@ -393,6 +475,7 @@ export default function App() {
         isError={toast.isError}
         onDone={() => setToast({ message: '', isError: false })}
       />
+
     </>
   );
 }

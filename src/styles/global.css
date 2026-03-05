@@ -97,3 +97,110 @@ body {
 .effort-mode-btn.active.accent-d { border-color: var(--accent-d); color: var(--accent-d); background: var(--accent-d-dim); }
 .effort-mode-btn.active.accent-e { border-color: var(--accent-e); color: var(--accent-e); background: var(--accent-e-dim); }
 .effort-mode-btn.active.accent-f { border-color: var(--accent-f); color: var(--accent-f); background: var(--accent-f-dim); }
+
+/* Session inline edit controls */
+.session-ex-edit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  margin-bottom: -2px;
+}
+
+.session-ex-edit-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-ex-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.session-stepper {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s;
+}
+.session-stepper:hover:not(:disabled) { border-color: var(--text-dim); }
+.session-stepper:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.session-sets-val {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  min-width: 42px;
+  text-align: center;
+}
+
+.session-remove-btn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--red);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.session-remove-btn:hover { background: rgba(255,74,106,0.1); border-color: var(--red); }
+
+.session-edit-footer {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.session-add-btn {
+  flex: 1;
+  padding: 13px;
+  border-radius: var(--radius);
+  border: 2px dashed var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.session-add-btn:hover { border-color: var(--text-dim); color: var(--text); }
+
+.session-save-routine-btn {
+  flex: 1;
+  padding: 13px;
+  border-radius: var(--radius);
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.session-save-routine-btn.accent-a { border-color: var(--accent-a); color: var(--accent-a); background: var(--accent-a-dim); }
+.session-save-routine-btn.accent-b { border-color: var(--accent-b); color: var(--accent-b); background: var(--accent-b-dim); }
+.session-save-routine-btn.accent-c { border-color: var(--accent-c); color: var(--accent-c); background: var(--accent-c-dim); }
+.session-save-routine-btn.accent-d { border-color: var(--accent-d); color: var(--accent-d); background: var(--accent-d-dim); }
+.session-save-routine-btn.accent-e { border-color: var(--accent-e); color: var(--accent-e); background: var(--accent-e-dim); }
+.session-save-routine-btn.accent-f { border-color: var(--accent-f); color: var(--accent-f); background: var(--accent-f-dim); }

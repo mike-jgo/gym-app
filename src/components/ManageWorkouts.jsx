@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PRESET_EXERCISES } from '../utils/workouts';
-import { generateExerciseId, nextAvailableColor } from '../utils/config';
+import { nextAvailableColor } from '../utils/config';
+import { resolveExercise } from '../utils/exerciseRegistry';
 import './ManageWorkouts.css';
 
 const COLORS = ['a', 'b', 'c', 'd', 'e', 'f'];
@@ -10,7 +11,7 @@ function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
-export default function ManageWorkouts({ config, onSave, onCancel }) {
+export default function ManageWorkouts({ config, onSave, onCancel, registry = {}, onRegistryUpdate }) {
   const [draft, setDraft] = useState(() => deepClone(config));
   const [selectedId, setSelectedId] = useState(draft.workouts[0]?.id ?? null);
   const [showPresetPicker, setShowPresetPicker] = useState(false);
@@ -77,11 +78,15 @@ export default function ManageWorkouts({ config, onSave, onCancel }) {
     if (!selectedId) return;
     const name = prompt('Exercise name:');
     if (!name?.trim()) return;
-    const id = generateExerciseId(name.trim());
-    updateExercises(selectedId, (exs) => [
-      ...exs,
-      { id, name: name.trim(), sets: 3 },
-    ]);
+    const resolved = resolveExercise(name.trim(), registry);
+    if (resolved.isNew && onRegistryUpdate) {
+      onRegistryUpdate({ ...registry, [resolved.id]: { id: resolved.id, name: resolved.name } });
+    }
+    const preset = PRESET_EXERCISES.find((p) => p.id === resolved.id);
+    updateExercises(selectedId, (exs) => {
+      if (exs.find((e) => e.id === resolved.id)) return exs;
+      return [...exs, { id: resolved.id, name: resolved.name, sets: preset?.sets ?? 3 }];
+    });
   };
 
   const removeExercise = (workoutId, exId) => {

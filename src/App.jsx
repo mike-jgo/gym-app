@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { calc1RM } from './utils/calc';
-import { generateExerciseId } from './utils/config';
+import { PRESET_EXERCISES } from './utils/workouts';
+import { loadRegistry, saveRegistry, resolveExercise } from './utils/exerciseRegistry';
 import {
   loadField,
   clearFields,
@@ -25,6 +26,7 @@ import ExerciseCard from './components/ExerciseCard';
 import FooterActions from './components/FooterActions';
 import Toast from './components/Toast';
 import ManageWorkouts from './components/ManageWorkouts';
+import SessionExercisePicker from './components/SessionExercisePicker';
 
 const EFFORT_EPSILON = 0.0001;
 
@@ -83,6 +85,8 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [sessionExercises, setSessionExercises] = useState(null);
   const [editMode, setEditMode] = useState(false);
+  const [showSessionPicker, setShowSessionPicker] = useState(false);
+  const [exerciseRegistry, setExerciseRegistry] = useState(() => loadRegistry());
   const timer = useTimer();
   const sessionTimer = useSessionTimer();
   const sheets = useSheets();
@@ -164,11 +168,23 @@ export default function App() {
     );
   };
 
-  const addExerciseToSession = () => {
-    const name = prompt('Exercise name:');
-    if (!name?.trim()) return;
-    const id = generateExerciseId(name.trim());
-    setSessionExercises((prev) => [...prev, { id, name: name.trim(), sets: 3 }]);
+  const handleSessionExercisePick = (picked) => {
+    setShowSessionPicker(false);
+    let exercise;
+    if (picked.id) {
+      const preset = PRESET_EXERCISES.find((p) => p.id === picked.id);
+      exercise = { id: picked.id, name: picked.name, sets: preset?.sets ?? 3 };
+    } else {
+      const resolved = resolveExercise(picked.name, exerciseRegistry);
+      if (resolved.isNew) {
+        const updated = { ...exerciseRegistry, [resolved.id]: { id: resolved.id, name: resolved.name } };
+        setExerciseRegistry(updated);
+        saveRegistry(updated);
+      }
+      const preset = PRESET_EXERCISES.find((p) => p.id === resolved.id);
+      exercise = { id: resolved.id, name: resolved.name, sets: preset?.sets ?? 3 };
+    }
+    setSessionExercises((prev) => [...(prev ?? exercises), exercise]);
   };
 
   const handleSaveToRoutine = () => {
@@ -326,6 +342,8 @@ export default function App() {
         config={config}
         onSave={handleManageSave}
         onCancel={() => setScreen('home')}
+        registry={exerciseRegistry}
+        onRegistryUpdate={(updated) => { setExerciseRegistry(updated); saveRegistry(updated); }}
       />
     );
   }
@@ -450,7 +468,7 @@ export default function App() {
 
       {editMode && (
         <div className="session-edit-footer">
-          <button className="session-add-btn" onClick={addExerciseToSession}>
+          <button className="session-add-btn" onClick={() => setShowSessionPicker(true)}>
             + ADD EXERCISE
           </button>
           <button
@@ -476,6 +494,14 @@ export default function App() {
         onDone={() => setToast({ message: '', isError: false })}
       />
 
+      {showSessionPicker && (
+        <SessionExercisePicker
+          registry={exerciseRegistry}
+          sessionExerciseIds={new Set(exercises.map((e) => e.id))}
+          onPick={handleSessionExercisePick}
+          onClose={() => setShowSessionPicker(false)}
+        />
+      )}
     </>
   );
 }

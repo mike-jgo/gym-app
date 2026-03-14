@@ -17,6 +17,7 @@ import { useConfig } from './hooks/useConfig';
 import { formatElapsed } from './utils/date';
 
 import { fetchSessions } from './utils/sheets';
+import { fetchExercisesFromSheets, saveExerciseToSheets } from './utils/config';
 
 import Header from './components/Header';
 import HomeScreen from './components/HomeScreen';
@@ -99,6 +100,19 @@ export default function App() {
     }
   }, [config, activeWorkoutId]);
 
+  // Sync exercise registry from Sheets on startup
+  useEffect(() => {
+    if (!sheets.configured) return;
+    fetchExercisesFromSheets().then((remote) => {
+      if (!remote) return;
+      setExerciseRegistry((local) => {
+        const merged = { ...remote, ...local }; // local wins on conflict
+        saveRegistry(merged);
+        return merged;
+      });
+    });
+  }, [sheets.configured]);
+
   const activeWorkout = config?.workouts.find((w) => w.id === activeWorkoutId) ?? config?.workouts[0];
   const workoutColor = activeWorkout?.color ?? 'a';
   const workoutLabel = activeWorkout?.label ?? '';
@@ -180,6 +194,7 @@ export default function App() {
         const updated = { ...exerciseRegistry, [resolved.id]: { id: resolved.id, name: resolved.name } };
         setExerciseRegistry(updated);
         saveRegistry(updated);
+        saveExerciseToSheets({ id: resolved.id, name: resolved.name });
       }
       const preset = PRESET_EXERCISES.find((p) => p.id === resolved.id);
       exercise = { id: resolved.id, name: resolved.name, sets: preset?.sets ?? 3 };

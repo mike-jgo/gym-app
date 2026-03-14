@@ -15,6 +15,8 @@ const LAST_SHEET = 'LastLifts';
 const CONFIG_SHEET = 'Config';
 const SESSIONS_SHEET = 'Sessions';
 const PB_SHEET = 'PBs';
+const EXERCISES_SHEET = 'Exercises';
+const EXERCISES_HEADERS = ['ExerciseID', 'Name'];
 const LOG_HEADERS = [
   'Date', 'Workout', 'Exercise', 'ExerciseID', 'Set', 'Weight', 'Reps', 'e1RM', 'Bodyweight',
   'RPE', 'RIR', 'VolumeLoad', 'HardSet'
@@ -54,6 +56,10 @@ function initSheets() {
     {
       name: PB_SHEET,
       headers: PB_HEADERS
+    },
+    {
+      name: EXERCISES_SHEET,
+      headers: EXERCISES_HEADERS
     }
   ];
 
@@ -95,6 +101,10 @@ function doGet(e) {
     return sendJson(getConfig());
   }
 
+  if (action === 'getExercises') {
+    return sendJson(getExercises());
+  }
+
   return sendJson({ status: 'error', message: 'Unknown action' });
 }
 
@@ -110,6 +120,10 @@ function doPost(e) {
 
     if (body.action === 'saveConfig') {
       return sendJson(saveConfig(body));
+    }
+
+    if (body.action === 'saveExercise') {
+      return sendJson(saveExercise(body));
     }
 
     if (body.action === 'fixDuplicates') {
@@ -528,6 +542,44 @@ function saveConfig(data) {
   return { status: 'ok' };
 }
 
+// Get all custom exercises keyed by ExerciseID
+function getExercises() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(EXERCISES_SHEET);
+  if (!sheet) return { status: 'ok', data: {} };
+
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { status: 'ok', data: {} };
+
+  var result = {};
+  for (var i = 1; i < data.length; i++) {
+    var id = String(data[i][0] || '').trim();
+    var name = String(data[i][1] || '').trim();
+    if (id && name) result[id] = { id: id, name: name };
+  }
+  return { status: 'ok', data: result };
+}
+
+// Upsert a custom exercise by ID
+function saveExercise(body) {
+  var ex = body.exercise;
+  if (!ex || !ex.id || !ex.name) return { status: 'error', message: 'Missing exercise id or name' };
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(EXERCISES_SHEET);
+  if (!sheet) return { status: 'error', message: 'Exercises sheet not found' };
+
+  const data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === ex.id) {
+      sheet.getRange(i + 1, 2).setValue(ex.name);
+      return { status: 'ok' };
+    }
+  }
+  sheet.appendRow([ex.id, ex.name]);
+  return { status: 'ok' };
+}
+
 // Format a value that may have been auto-converted to a Date by Sheets
 function formatDateVal(val, fmt) {
   if (val instanceof Date) {
@@ -648,6 +700,62 @@ function fixDuplicateExercises() {
       sessSheet.getRange(i + 1, exCol + 1).setValue(JSON.stringify(exercises));
       sessFixed++;
     }
+  }
+
+  // 7. Fix Config sheet — remap exercise IDs inside the stored config JSON
+  var configSheet = ss.getSheetByName(CONFIG_SHEET);
+  if (configSheet) {
+    var configRows = configSheet.getDataRange().getValues();
+    for (var i = 0; i < configRows.length; i++) {
+      if (String(configRows[i][0]) !== 'config') continue;
+      var cfg;
+      try { cfg = JSON.parse(configRows[i][1]); } catch(e) { break; }
+      var configChanged = false;
+      (cfg.workouts || []).forEach(function(w) {
+        (w.exercises || []).forEach(function(ex) {
+          if (idRemap[ex.id]) {
+            ex.id = idRemap[ex.id];
+            configChanged = true;
+          }
+        });
+      });
+      if (configChanged) {
+        configSheet.getRange(i + 1, 2).setValue(JSON.stringify(cfg));
+      }
+      break;
+    }
+  }
+
+  // 8. Fix Exercises sheet — remove duplicate rows, ensure all canonical IDs are present
+  var exSheet = ss.getSheetByName(EXERCISES_SHEET);
+  if (exSheet) {
+    // Build canonicalId → name lookup from nameToIds
+    var canonToName = {};
+    Object.keys(nameToIds).forEach(function(name) {
+      Object.keys(nameToIds[name]).forEach(function(id) {
+        if (!idRemap[id]) canonToName[id] = name;
+      });
+    });
+
+    var exData = exSheet.getDataRange().getValues();
+    var exIdsSeen = {};
+
+    // Delete rows whose ID is a duplicate (bottom-up to keep row numbers stable)
+    for (var i = exData.length - 1; i >= 1; i--) {
+      var exId = String(exData[i][0] || '').trim();
+      if (idRemap[exId]) {
+        exSheet.deleteRow(i + 1);
+      } else if (exId) {
+        exIdsSeen[exId] = true;
+      }
+    }
+
+    // Append any canonical ID that isn't already in the Exercises sheet
+    Object.keys(canonToName).forEach(function(canonId) {
+      if (!exIdsSeen[canonId]) {
+        exSheet.appendRow([canonId, canonToName[canonId]]);
+      }
+    });
   }
 
   var result = {

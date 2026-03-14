@@ -67,6 +67,29 @@ export async function saveConfigToSheets(config) {
   return result;
 }
 
+export async function fetchExercisesFromSheets() {
+  const url = getApiUrl();
+  if (!url) return null;
+  try {
+    const response = await fetch(`${url}?action=getExercises`);
+    const result = await response.json();
+    if (result.status === 'ok' && result.data) return result.data;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveExerciseToSheets(exercise) {
+  const url = getApiUrl();
+  if (!url) return;
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ action: 'saveExercise', exercise }),
+  }).catch(() => {});
+}
+
 export function generateExerciseId(name) {
   const slug = name
     .toLowerCase()

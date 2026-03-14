@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PRESET_EXERCISES } from '../utils/workouts';
-import { nextAvailableColor } from '../utils/config';
+import { nextAvailableColor, saveExerciseToSheets } from '../utils/config';
 import { resolveExercise } from '../utils/exerciseRegistry';
 import './ManageWorkouts.css';
 
@@ -81,6 +81,7 @@ export default function ManageWorkouts({ config, onSave, onCancel, registry = {}
     const resolved = resolveExercise(name.trim(), registry);
     if (resolved.isNew && onRegistryUpdate) {
       onRegistryUpdate({ ...registry, [resolved.id]: { id: resolved.id, name: resolved.name } });
+      saveExerciseToSheets({ id: resolved.id, name: resolved.name });
     }
     const preset = PRESET_EXERCISES.find((p) => p.id === resolved.id);
     updateExercises(selectedId, (exs) => {

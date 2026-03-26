@@ -36,7 +36,9 @@ export function useSupabase(session) {
     const id = `sess_${Date.now().toString(36)}_${(++sessionIdRef.current).toString(36)}`;
     try {
       await saveSession({ ...payload, id });
-      await loadData();
+      // Refresh state in the background — a sync failure here won't affect the
+      // save result, so handleComplete can safely clear fields and navigate away.
+      loadData();
       return true;
     } catch (err) {
       setStatus('error');

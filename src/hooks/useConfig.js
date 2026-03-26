@@ -1,58 +1,64 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  buildDefaultConfig,
   loadConfigFromStorage,
   saveConfigToStorage,
-  fetchConfigFromSheets,
-  saveConfigToSheets,
+  fetchConfigFromSupabase,
+  saveConfig as persistConfig,
+  seedDefaultWorkouts,
 } from '../utils/config';
-import { getApiUrl } from '../utils/sheets';
 
-export function useConfig() {
+export function useConfig(session) {
   const [config, setConfig] = useState(null);
-  const [configStatus, setConfigStatus] = useState('loading'); // loading | ready
+  const [configStatus, setConfigStatus] = useState('loading');
 
   useEffect(() => {
+    if (!session) return;
     let cancelled = false;
 
     async function load() {
-      // 1. Try localStorage immediately
+      // 1. Show cached config immediately for fast first paint
       const local = loadConfigFromStorage();
       if (local && !cancelled) {
         setConfig(local);
         setConfigStatus('ready');
       }
 
-      // 2. Try Sheets if configured
-      if (getApiUrl()) {
-        const remote = await fetchConfigFromSheets();
-        if (remote && !cancelled) {
+      // 2. Fetch authoritative config from Supabase
+      try {
+        const remote = await fetchConfigFromSupabase();
+
+        if (cancelled) return;
+
+        if (remote.workouts.length === 0) {
+          // New user — seed default workouts A & B
+          await seedDefaultWorkouts();
+          const seeded = await fetchConfigFromSupabase();
+          if (!cancelled) {
+            setConfig(seeded);
+            saveConfigToStorage(seeded);
+            setConfigStatus('ready');
+          }
+        } else {
           setConfig(remote);
           saveConfigToStorage(remote);
           setConfigStatus('ready');
-          return;
         }
-      }
-
-      // 3. Fall back to defaults
-      if (!cancelled && !local) {
-        const defaults = buildDefaultConfig();
-        setConfig(defaults);
-        saveConfigToStorage(defaults);
-        setConfigStatus('ready');
+      } catch {
+        // Supabase unavailable — fall back to local or empty
+        if (!cancelled && !local) {
+          setConfigStatus('ready');
+        }
       }
     }
 
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [session]);
 
   const saveConfig = useCallback((newConfig) => {
-    saveConfigToStorage(newConfig);
     setConfig(newConfig);
-    if (getApiUrl()) {
-      saveConfigToSheets(newConfig).catch(() => {});
-    }
+    saveConfigToStorage(newConfig);
+    persistConfig(newConfig).catch(() => {});
   }, []);
 
   return { config, configStatus, saveConfig };

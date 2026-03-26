@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS workout_exercises (
   exercise_id TEXT        NOT NULL REFERENCES exercises(id),
   sets        INT         NOT NULL DEFAULT 3,
   sort_order  INT         NOT NULL DEFAULT 0,
+  -- ON DELETE CASCADE: deleting a workout automatically removes its exercises here.
+  -- save_config RPC relies on this — it only deletes from workouts, not here directly.
   FOREIGN KEY (workout_id, user_id) REFERENCES workouts(id, user_id) ON DELETE CASCADE
 );
 

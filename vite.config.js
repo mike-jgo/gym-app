@@ -1,7 +1,8 @@
 import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  plugins: [react()],
-  base: "/gym-app/", // relative paths for GitHub Pages
+  plugins: [tailwindcss(), react()],
+  base: "/gym-app/",
 });

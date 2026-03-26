@@ -11,8 +11,8 @@ export function loadRegistryFromStorage(userId) {
     const raw = localStorage.getItem(REGISTRY_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    if (!parsed || parsed._userId !== userId) return {};
-    const { _userId, ...registry } = parsed;
+    if (!parsed || parsed.userId !== userId) return {};
+    const { userId: _uid, ...registry } = parsed;
     return registry;
   } catch {
     return {};
@@ -20,7 +20,7 @@ export function loadRegistryFromStorage(userId) {
 }
 
 export function saveRegistryToStorage(registry, userId) {
-  localStorage.setItem(REGISTRY_KEY, JSON.stringify({ _userId: userId, ...registry }));
+  localStorage.setItem(REGISTRY_KEY, JSON.stringify({ userId, ...registry }));
 }
 
 // Fetch all exercises (presets + user custom) from Supabase.

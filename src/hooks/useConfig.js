@@ -62,7 +62,9 @@ export function useConfig(session) {
     const userId = session?.user?.id;
     setConfig(newConfig);
     saveConfigToStorage(newConfig, userId);
-    persistConfig(newConfig, userId).catch(() => {});
+    persistConfig(newConfig, userId).catch(() => {
+      setConfigStatus('error');
+    });
   }, [session]);
 
   return { config, configStatus, saveConfig };

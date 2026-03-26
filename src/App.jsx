@@ -80,7 +80,7 @@ function normalizeEffort(rpeRaw, rirRaw) {
 }
 
 export default function App() {
-  const { session, loading: authLoading, magicLinkSent, sendMagicLink, signOut } = useAuth();
+  const { session, loading: authLoading, magicLinkSent, sendMagicLink, signOut, returnToApp } = useAuth();
 
   const [toast, setToast] = useState({ message: '', isError: false });
   const [bodyweight, setBodyweight] = useState(() => loadBodyweight());
@@ -371,6 +371,7 @@ export default function App() {
       <AuthScreen
         onSendMagicLink={sendMagicLink}
         magicLinkSent={magicLinkSent}
+        returnToApp={returnToApp}
       />
     );
   }

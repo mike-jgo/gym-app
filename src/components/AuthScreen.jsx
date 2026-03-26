@@ -1,9 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
-export default function AuthScreen({ onSendMagicLink, magicLinkSent }) {
+const COOLDOWN_SECONDS = 60;
+
+export default function AuthScreen({ onSendMagicLink, magicLinkSent, returnToApp }) {
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    timerRef.current = setTimeout(() => setCooldown(c => c - 1), 1000);
+    return () => clearTimeout(timerRef.current);
+  }, [cooldown]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -12,6 +22,7 @@ export default function AuthScreen({ onSendMagicLink, magicLinkSent }) {
     setError('');
     try {
       await onSendMagicLink(email.trim());
+      setCooldown(COOLDOWN_SECONDS);
     } catch (err) {
       setError(err.message || 'Failed to send link');
     } finally {
@@ -25,16 +36,24 @@ export default function AuthScreen({ onSendMagicLink, magicLinkSent }) {
         FITLOG
       </h1>
 
-      {magicLinkSent ? (
+      {returnToApp ? (
+        <div className="flex flex-col items-center gap-4 max-w-[280px] text-center">
+          <p className="text-text font-mono text-sm tracking-wide">YOU'RE SIGNED IN</p>
+          <p className="text-muted text-sm leading-relaxed">
+            Open the app from your home screen to continue.
+          </p>
+        </div>
+      ) : magicLinkSent ? (
         <div className="flex flex-col items-center gap-6 max-w-[280px] text-center">
           <p className="text-muted leading-relaxed">
             Check your email for a magic link to sign in.
           </p>
           <button
-            className="font-mono text-xs tracking-widest text-[var(--accent-a)] border border-[var(--accent-a)] rounded-lg px-5 py-2.5 bg-transparent cursor-pointer"
-            onClick={() => onSendMagicLink(email)}
+            className="font-mono text-xs tracking-widest text-[var(--accent-a)] border border-[var(--accent-a)] rounded-lg px-5 py-2.5 bg-transparent cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
+            onClick={handleSubmit}
+            disabled={cooldown > 0}
           >
-            RESEND
+            {cooldown > 0 ? `RESEND IN ${cooldown}s` : 'RESEND'}
           </button>
         </div>
       ) : (

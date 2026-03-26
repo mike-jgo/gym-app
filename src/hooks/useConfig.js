@@ -6,7 +6,6 @@ import {
   saveConfig as persistConfig,
   seedDefaultWorkouts,
 } from '../utils/config';
-import { DEFAULT_WORKOUTS } from '../utils/workouts';
 
 export function useConfig(session) {
   const [config, setConfig] = useState(null);
@@ -46,9 +45,10 @@ export function useConfig(session) {
           setConfigStatus('ready');
         }
       } catch {
-        // Supabase unavailable — fall back to local cache or in-memory defaults
+        // Supabase unavailable — local cache already shown if it existed.
+        // Don't fall back to DEFAULT_WORKOUTS: an existing user seeing default
+        // workouts could mistakenly log a session on the wrong workout.
         if (!cancelled && !local) {
-          setConfig({ version: 1, workouts: DEFAULT_WORKOUTS });
           setConfigStatus('error');
         }
       }

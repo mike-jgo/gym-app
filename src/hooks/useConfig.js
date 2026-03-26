@@ -6,6 +6,7 @@ import {
   saveConfig as persistConfig,
   seedDefaultWorkouts,
 } from '../utils/config';
+import { DEFAULT_WORKOUTS } from '../utils/workouts';
 
 export function useConfig(session) {
   const [config, setConfig] = useState(null);
@@ -14,10 +15,11 @@ export function useConfig(session) {
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
+    const userId = session.user.id;
 
     async function load() {
-      // 1. Show cached config immediately for fast first paint
-      const local = loadConfigFromStorage();
+      // 1. Show cached config immediately for fast first paint (only if same user)
+      const local = loadConfigFromStorage(userId);
       if (local && !cancelled) {
         setConfig(local);
         setConfigStatus('ready');
@@ -35,18 +37,19 @@ export function useConfig(session) {
           const seeded = await fetchConfigFromSupabase();
           if (!cancelled) {
             setConfig(seeded);
-            saveConfigToStorage(seeded);
+            saveConfigToStorage(seeded, userId);
             setConfigStatus('ready');
           }
         } else {
           setConfig(remote);
-          saveConfigToStorage(remote);
+          saveConfigToStorage(remote, userId);
           setConfigStatus('ready');
         }
       } catch {
-        // Supabase unavailable — fall back to local or empty
+        // Supabase unavailable — fall back to local cache or in-memory defaults
         if (!cancelled && !local) {
-          setConfigStatus('ready');
+          setConfig({ version: 1, workouts: DEFAULT_WORKOUTS });
+          setConfigStatus('error');
         }
       }
     }
@@ -56,10 +59,11 @@ export function useConfig(session) {
   }, [session]);
 
   const saveConfig = useCallback((newConfig) => {
+    const userId = session?.user?.id;
     setConfig(newConfig);
-    saveConfigToStorage(newConfig);
-    persistConfig(newConfig).catch(() => {});
-  }, []);
+    saveConfigToStorage(newConfig, userId);
+    persistConfig(newConfig, userId).catch(() => {});
+  }, [session]);
 
   return { config, configStatus, saveConfig };
 }

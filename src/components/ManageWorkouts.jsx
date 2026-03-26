@@ -18,7 +18,7 @@ function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
-export default function ManageWorkouts({ config, onSave, onCancel, registry = {}, onRegistryUpdate }) {
+export default function ManageWorkouts({ config, onSave, onCancel, registry = {}, onRegistryUpdate, userId }) {
   const [draft, setDraft] = useState(() => deepClone(config));
   const [selectedId, setSelectedId] = useState(draft.workouts[0]?.id ?? null);
   const [showPicker, setShowPicker] = useState(false);
@@ -67,7 +67,7 @@ export default function ManageWorkouts({ config, onSave, onCancel, registry = {}
       const resolved = resolveExercise(picked.name, registry);
       if (resolved.isNew && onRegistryUpdate) {
         try {
-          const updated = await addExercise({ id: resolved.id, name: resolved.name }, registry);
+          const updated = await addExercise({ id: resolved.id, name: resolved.name }, registry, userId);
           onRegistryUpdate(updated);
         } catch {
           onRegistryUpdate({ ...registry, [resolved.id]: { id: resolved.id, name: resolved.name } });

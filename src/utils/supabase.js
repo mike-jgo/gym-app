@@ -62,53 +62,11 @@ export async function fetchWorkouts() {
 }
 
 export async function saveConfig(config) {
-  const userId = await getCurrentUserId();
-  if (!userId) throw new Error('Not authenticated');
-
-  for (let i = 0; i < config.workouts.length; i++) {
-    const w = config.workouts[i];
-
-    // Upsert the workout row
-    const { error: wErr } = await supabase
-      .from('workouts')
-      .upsert({ id: w.id, user_id: userId, label: w.label, color: w.color, sort_order: i });
-    if (wErr) throw wErr;
-
-    // Replace workout_exercises: delete then re-insert
-    const { error: delErr } = await supabase
-      .from('workout_exercises')
-      .delete()
-      .eq('workout_id', w.id)
-      .eq('user_id', userId);
-    if (delErr) throw delErr;
-
-    if (w.exercises.length > 0) {
-      const rows = w.exercises.map((ex, idx) => ({
-        workout_id: w.id,
-        user_id: userId,
-        exercise_id: ex.id,
-        sets: ex.sets,
-        sort_order: idx,
-      }));
-      const { error: insErr } = await supabase.from('workout_exercises').insert(rows);
-      if (insErr) throw insErr;
-    }
-  }
-
-  // Delete workouts removed from config
-  const keepIds = config.workouts.map((w) => w.id);
-  if (keepIds.length > 0) {
-    const { error } = await supabase
-      .from('workouts')
-      .delete()
-      .eq('user_id', userId)
-      .not('id', 'in', `(${keepIds.map((id) => `"${id}"`).join(',')})`);
-    if (error) throw error;
-  } else {
-    // All workouts removed
-    const { error } = await supabase.from('workouts').delete().eq('user_id', userId);
-    if (error) throw error;
-  }
+  // Delegates to the save_config Postgres RPC which runs atomically in a single
+  // transaction. auth.uid() inside the function reads from the caller's JWT —
+  // no separate getCurrentUserId() network call needed.
+  const { error } = await supabase.rpc('save_config', { config_json: config });
+  if (error) throw error;
 }
 
 // ── Sessions ──────────────────────────────────────────────────

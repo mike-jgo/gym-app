@@ -1,93 +1,39 @@
-import { WORKOUTS } from './workouts';
-import { getApiUrl } from './sheets';
+import { fetchWorkouts, saveConfig as saveConfigToSupabase } from './supabase';
+import { DEFAULT_WORKOUTS } from './workouts';
 
 export const CONFIG_KEY = 'fbeod_config';
 
 const COLORS = ['a', 'b', 'c', 'd', 'e', 'f'];
 
-export function buildDefaultConfig() {
-  return {
-    version: 1,
-    workouts: [
-      {
-        id: 'workout_a',
-        label: 'A',
-        color: 'a',
-        exercises: WORKOUTS.A.map((ex) => ({ ...ex })),
-      },
-      {
-        id: 'workout_b',
-        label: 'B',
-        color: 'b',
-        exercises: WORKOUTS.B.map((ex) => ({ ...ex })),
-      },
-    ],
-  };
-}
-
-export function loadConfigFromStorage() {
+export function loadConfigFromStorage(userId) {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.workouts)) return null;
-    return parsed;
+    if (parsed.userId !== userId) return null;
+    const { userId: _uid, ...config } = parsed;
+    return config;
   } catch {
     return null;
   }
 }
 
-export function saveConfigToStorage(config) {
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+export function saveConfigToStorage(config, userId) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify({ userId, ...config }));
 }
 
-export async function fetchConfigFromSheets() {
-  const url = getApiUrl();
-  if (!url) return null;
-  try {
-    const response = await fetch(`${url}?action=getConfig`);
-    const result = await response.json();
-    if (result.status === 'ok' && result.data) return result.data;
-    return null;
-  } catch {
-    return null;
-  }
+export async function fetchConfigFromSupabase() {
+  return fetchWorkouts();
 }
 
-export async function saveConfigToSheets(config) {
-  const url = getApiUrl();
-  if (!url) throw new Error('No API URL configured');
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action: 'saveConfig', config }),
-  });
-  const result = await response.json();
-  if (result.status !== 'ok') throw new Error(result.message || 'Config save failed');
-  return result;
+export async function saveConfig(config, userId) {
+  saveConfigToStorage(config, userId);
+  await saveConfigToSupabase(config);
 }
 
-export async function fetchExercisesFromSheets() {
-  const url = getApiUrl();
-  if (!url) return null;
-  try {
-    const response = await fetch(`${url}?action=getExercises`);
-    const result = await response.json();
-    if (result.status === 'ok' && result.data) return result.data;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveExerciseToSheets(exercise) {
-  const url = getApiUrl();
-  if (!url) return;
-  fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action: 'saveExercise', exercise }),
-  }).catch(() => {});
+export async function seedDefaultWorkouts() {
+  await saveConfigToSupabase({ version: 1, workouts: DEFAULT_WORKOUTS });
 }
 
 export function generateExerciseId(name) {

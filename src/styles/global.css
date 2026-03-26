@@ -1,48 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-bg:       #0a0a0f;
+  --color-surface:  #14141f;
+  --color-surface2: #1c1c2e;
+  --color-line:     #2a2a40;
+  --color-text:     #e8e8f0;
+  --color-muted:    #7a7a95;
+  --color-green:    #4aff8b;
+  --color-red:      #ff4a6a;
+  --color-yellow:   #ffd24a;
+
+  /* Fonts */
+  --font-sans: 'Outfit', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Radius */
+  --radius-card: 14px;
+
+  /* Animations */
+  --animate-pulse-slow: pulse-slow 1.2s ease infinite;
+  --animate-pulse-dot:  pulse-dot 0.8s ease infinite;
+  --animate-pulse-btn:  pulse-btn 1s ease infinite;
+  --animate-toast:      toast-in 0.35s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+/* ── Keyframes ───────────────────────────────────────────── */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+@keyframes pulse-btn {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(100px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Dynamic accent colors (a–f) ─────────────────────────── */
+/* Referenced via --accent / --accent-dim set as inline style */
 :root {
-  --bg: #0a0a0f;
-  --surface: #14141f;
-  --surface2: #1c1c2e;
-  --border: #2a2a40;
-  --text: #e8e8f0;
-  --text-dim: #7a7a95;
-  --accent-a: #ff6b4a;
-  --accent-a-dim: rgba(255,107,74,0.15);
-  --accent-b: #4aadff;
-  --accent-b-dim: rgba(74,173,255,0.15);
-  --accent-c: #a855f7;
-  --accent-c-dim: rgba(168,85,247,0.15);
-  --accent-d: #22d3ee;
-  --accent-d-dim: rgba(34,211,238,0.15);
-  --accent-e: #ffb44a;
-  --accent-e-dim: rgba(255,180,74,0.15);
-  --accent-f: #f472b6;
-  --accent-f-dim: rgba(244,114,182,0.15);
-  --green: #4aff8b;
+  --accent-a: #ff6b4a; --accent-a-dim: rgba(255,107,74,0.15);
+  --accent-b: #4aadff; --accent-b-dim: rgba(74,173,255,0.15);
+  --accent-c: #a855f7; --accent-c-dim: rgba(168,85,247,0.15);
+  --accent-d: #22d3ee; --accent-d-dim: rgba(34,211,238,0.15);
+  --accent-e: #ffb44a; --accent-e-dim: rgba(255,180,74,0.15);
+  --accent-f: #f472b6; --accent-f-dim: rgba(244,114,182,0.15);
   --green-dim: rgba(74,255,139,0.12);
-  --red: #ff4a6a;
-  --yellow: #ffd24a;
-  --radius: 14px;
-  --accent: var(--accent-a);
-  --accent-dim: var(--accent-a-dim);
-  --safe-top: env(safe-area-inset-top, 20px);
+  --safe-top:    env(safe-area-inset-top, 20px);
   --safe-bottom: env(safe-area-inset-bottom, 20px);
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* ── Base ────────────────────────────────────────────────── */
+*, *::before, *::after {
   -webkit-tap-highlight-color: transparent;
 }
 
-button {
-  touch-action: manipulation;
-}
+button { touch-action: manipulation; }
 
 body {
-  font-family: 'Outfit', -apple-system, sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-text);
   min-height: 100dvh;
   padding: var(--safe-top) 16px calc(var(--safe-bottom) + 16px);
   overflow-x: hidden;
@@ -51,156 +77,18 @@ body {
 
 ::-webkit-scrollbar { width: 0; }
 
-/* Shared utilities */
-.mono { font-family: 'JetBrains Mono', monospace; }
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+/* ── TimerBar progress fill (::before can't be done in Tailwind) ── */
+.timer-fill::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: var(--timer-pct, 0%);
+  background: var(--accent-dim);
+  transition: width 1s linear;
 }
 
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+/* ── ExerciseCard focused border (needs :has()) ────────────── */
+.exercise-card:has(input:focus) {
+  border-color: var(--accent);
 }
-
-.effort-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  font-size: 0.7rem;
-  color: var(--text-dim);
-}
-
-.effort-mode-btn {
-  border: 1px solid var(--border);
-  background: var(--surface2);
-  color: var(--text-dim);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.72rem;
-  cursor: pointer;
-}
-
-.effort-mode-btn.active {
-  font-weight: 700;
-}
-
-.effort-mode-btn.active.accent-a { border-color: var(--accent-a); color: var(--accent-a); background: var(--accent-a-dim); }
-.effort-mode-btn.active.accent-b { border-color: var(--accent-b); color: var(--accent-b); background: var(--accent-b-dim); }
-.effort-mode-btn.active.accent-c { border-color: var(--accent-c); color: var(--accent-c); background: var(--accent-c-dim); }
-.effort-mode-btn.active.accent-d { border-color: var(--accent-d); color: var(--accent-d); background: var(--accent-d-dim); }
-.effort-mode-btn.active.accent-e { border-color: var(--accent-e); color: var(--accent-e); background: var(--accent-e-dim); }
-.effort-mode-btn.active.accent-f { border-color: var(--accent-f); color: var(--accent-f); background: var(--accent-f-dim); }
-
-/* Session inline edit controls */
-.session-ex-edit {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius) var(--radius) 0 0;
-  margin-bottom: -2px;
-}
-
-.session-ex-edit-name {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text-dim);
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.session-ex-edit-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.session-stepper {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 1.5px solid var(--border);
-  background: var(--surface2);
-  color: var(--text);
-  font-size: 1rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: border-color 0.15s;
-}
-.session-stepper:hover:not(:disabled) { border-color: var(--text-dim); }
-.session-stepper:disabled { opacity: 0.3; cursor: not-allowed; }
-
-.session-sets-val {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  min-width: 42px;
-  text-align: center;
-}
-
-.session-remove-btn {
-  padding: 4px 8px;
-  border-radius: 6px;
-  border: 1.5px solid var(--border);
-  background: transparent;
-  color: var(--red);
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.session-remove-btn:hover { background: rgba(255,74,106,0.1); border-color: var(--red); }
-
-.session-edit-footer {
-  display: flex;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-.session-add-btn {
-  flex: 1;
-  padding: 13px;
-  border-radius: var(--radius);
-  border: 2px dashed var(--border);
-  background: transparent;
-  color: var(--text-dim);
-  font-family: 'Outfit', sans-serif;
-  font-weight: 700;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.session-add-btn:hover { border-color: var(--text-dim); color: var(--text); }
-
-.session-save-routine-btn {
-  flex: 1;
-  padding: 13px;
-  border-radius: var(--radius);
-  border: 2px solid var(--border);
-  background: var(--surface);
-  color: var(--text-dim);
-  font-family: 'Outfit', sans-serif;
-  font-weight: 700;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.session-save-routine-btn.accent-a { border-color: var(--accent-a); color: var(--accent-a); background: var(--accent-a-dim); }
-.session-save-routine-btn.accent-b { border-color: var(--accent-b); color: var(--accent-b); background: var(--accent-b-dim); }
-.session-save-routine-btn.accent-c { border-color: var(--accent-c); color: var(--accent-c); background: var(--accent-c-dim); }
-.session-save-routine-btn.accent-d { border-color: var(--accent-d); color: var(--accent-d); background: var(--accent-d-dim); }
-.session-save-routine-btn.accent-e { border-color: var(--accent-e); color: var(--accent-e); background: var(--accent-e-dim); }
-.session-save-routine-btn.accent-f { border-color: var(--accent-f); color: var(--accent-f); background: var(--accent-f-dim); }

@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import { calc1RM } from '../utils/calc';
 import { saveField, loadField } from '../utils/storage';
 import { formatDate } from '../utils/date';
-import './ExerciseCard.css';
 
 export default function ExerciseCard({
   exercise,
@@ -18,7 +17,6 @@ export default function ExerciseCard({
     [exercise.sets]
   );
 
-  // Compute best e1RM across all current sets
   const best1RM = useMemo(() => {
     let best = 0;
     for (const s of setNumbers) {
@@ -41,16 +39,13 @@ export default function ExerciseCard({
       handleInput(set, effortMode === 'rpe' ? 'rir' : 'rpe', '');
       return;
     }
-
     const n = parseFloat(value);
     if (!Number.isFinite(n)) return;
-
     if (effortMode === 'rpe') {
       handleInput(set, 'rir', (10 - n).toFixed(1).replace('.0', ''));
-      return;
+    } else {
+      handleInput(set, 'rpe', (10 - n).toFixed(1).replace('.0', ''));
     }
-
-    handleInput(set, 'rpe', (10 - n).toFixed(1).replace('.0', ''));
   };
 
   const formatSetSummary = (s, i) => {
@@ -58,61 +53,73 @@ export default function ExerciseCard({
     const rir = Number.isFinite(parseFloat(s.rir)) ? ` (RIR ${parseFloat(s.rir).toFixed(1).replace('.0', '')})` : '';
     return (
       <span key={i}>
-        <em>S{i + 1}</em> {s.w}x{s.r}{rpe}{rir}
+        <em className="not-italic text-[var(--accent)]">S{i + 1}</em>{' '}
+        {s.w}x{s.r}{rpe}{rir}
         {i < lastLift.sets.length - 1 ? '  ' : ''}
       </span>
     );
   };
 
-  // Last lift display
-  let lastLiftEl = null;
-  if (lastLift?.sets?.length) {
-    lastLiftEl = (
-      <div className="last-lift mono">
-        LAST: {lastLift.sets.map((s, i) => formatSetSummary(s, i))}
-        {lastLift.date && <span className="last-date">{formatDate(lastLift.date)}</span>}
-      </div>
-    );
-  }
-
-  let pbEl = null;
-  if (personalBest && personalBest.best1RM > 0) {
-    pbEl = (
-      <div className="pb-lift mono">
-        PB: <em>e1RM</em> {personalBest.best1RM}
-        {personalBest.best1RMDate && <span className="pb-date">{formatDate(personalBest.best1RMDate)}</span>}
-        <span className="pb-sep">|</span>
-        <em>WEIGHT</em> {personalBest.bestWeight}x{personalBest.bestWeightReps}
-        {personalBest.bestWeightDate && <span className="pb-date">{formatDate(personalBest.bestWeightDate)}</span>}
-      </div>
-    );
-  }
+  const infoBox = 'font-mono text-[0.78rem] text-muted mb-3 px-2.5 py-1.5 bg-surface2 rounded-lg';
 
   return (
-    <div className={`exercise-card workout-${workoutColor}`}>
-      <div className="ex-header">
-        <div className="ex-name">{exercise.name}</div>
-        <div className="ex-1rm mono">
-          e1RM {best1RM > 0 ? <strong>{best1RM.toFixed(1)}</strong> : '—'}
+    <div
+      className="exercise-card bg-surface border border-line rounded-card p-[18px] mb-3.5 transition-colors duration-300"
+      style={{
+        '--accent':     `var(--accent-${workoutColor})`,
+        '--accent-dim': `var(--accent-${workoutColor}-dim)`,
+      }}
+    >
+      {/* Header */}
+      <div className="flex justify-between items-start mb-3.5">
+        <div className="font-bold text-[1.05rem] leading-snug flex-1 pr-2.5">{exercise.name}</div>
+        <div className="font-mono text-[0.75rem] text-muted bg-surface2 rounded-lg px-2.5 py-1 whitespace-nowrap">
+          e1RM {best1RM > 0 ? <strong className="text-yellow">{best1RM.toFixed(1)}</strong> : '—'}
         </div>
       </div>
 
-      {lastLiftEl}
-      {pbEl}
+      {/* Last lift */}
+      {lastLift?.sets?.length > 0 && (
+        <div className={infoBox}>
+          LAST: {lastLift.sets.map((s, i) => formatSetSummary(s, i))}
+          {lastLift.date && (
+            <span className="opacity-50 ml-1.5">{formatDate(lastLift.date)}</span>
+          )}
+        </div>
+      )}
 
-      <div className="sets-grid">
+      {/* Personal best */}
+      {personalBest?.best1RM > 0 && (
+        <div className={`${infoBox} text-[0.74rem]`}>
+          PB:{' '}
+          <em className="not-italic text-yellow">e1RM</em>{' '}
+          {personalBest.best1RM}
+          {personalBest.best1RMDate && (
+            <span className="opacity-50 ml-1.5">{formatDate(personalBest.best1RMDate)}</span>
+          )}
+          <span className="opacity-50 mx-2">|</span>
+          <em className="not-italic text-yellow">WEIGHT</em>{' '}
+          {personalBest.bestWeight}x{personalBest.bestWeightReps}
+          {personalBest.bestWeightDate && (
+            <span className="opacity-50 ml-1.5">{formatDate(personalBest.bestWeightDate)}</span>
+          )}
+        </div>
+      )}
+
+      {/* Sets grid */}
+      <div className="grid gap-2" style={{ gridTemplateColumns: 'auto 1fr 1fr 1fr' }}>
         {setNumbers.map((s) => (
           <React.Fragment key={s}>
-            <span className="set-label mono">S{s}</span>
+            <span className="font-mono text-[0.75rem] text-muted font-semibold self-center">S{s}</span>
             <input
-              className="set-input mono"
+              className="w-full py-3 px-2.5 rounded-[10px] border-[1.5px] border-line bg-surface2 text-text font-mono text-[1.1rem] font-semibold text-center transition-colors duration-200 appearance-none outline-none focus:border-[var(--accent)] focus:bg-[var(--accent-dim)] placeholder:text-muted placeholder:font-normal placeholder:text-xs"
               inputMode="decimal"
               placeholder="kg"
               defaultValue={loadField(exercise.id, s, 'w')}
               onChange={(e) => handleInput(s, 'w', e.target.value)}
             />
             <input
-              className="set-input mono"
+              className="w-full py-3 px-2.5 rounded-[10px] border-[1.5px] border-line bg-surface2 text-text font-mono text-[1.1rem] font-semibold text-center transition-colors duration-200 appearance-none outline-none focus:border-[var(--accent)] focus:bg-[var(--accent-dim)] placeholder:text-muted placeholder:font-normal placeholder:text-xs"
               inputMode="decimal"
               placeholder="reps"
               defaultValue={loadField(exercise.id, s, 'r')}
@@ -120,7 +127,7 @@ export default function ExerciseCard({
             />
             <input
               key={`effort-${exercise.id}-${s}-${effortMode}`}
-              className="set-input mono set-input-effort"
+              className="w-full py-3 px-2.5 rounded-[10px] border-[1.5px] border-line bg-surface2 text-text font-mono text-[1rem] font-semibold text-center transition-colors duration-200 appearance-none outline-none focus:border-[var(--accent)] focus:bg-[var(--accent-dim)] placeholder:text-muted placeholder:font-normal placeholder:text-xs"
               inputMode="decimal"
               min={effortMode === 'rpe' ? '6' : '0'}
               max={effortMode === 'rpe' ? '10' : '4'}

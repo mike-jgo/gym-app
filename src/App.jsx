@@ -1,7 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { calc1RM } from './utils/calc';
-import { PRESET_EXERCISES } from './utils/workouts';
-import { loadRegistry, saveRegistry, resolveExercise } from './utils/exerciseRegistry';
+import {
+  saveRegistryToStorage,
+  loadRegistry,
+  resolveExercise,
+  addExercise,
+} from './utils/exerciseRegistry';
 import {
   loadField,
   clearFields,
@@ -10,15 +14,14 @@ import {
   loadEffortMode,
   saveEffortMode,
 } from './utils/storage';
+import { useAuth } from './hooks/useAuth';
 import { useTimer } from './hooks/useTimer';
 import { useSessionTimer } from './hooks/useSessionTimer';
-import { useSheets } from './hooks/useSheets';
+import { useSupabase } from './hooks/useSupabase';
 import { useConfig } from './hooks/useConfig';
 import { formatElapsed } from './utils/date';
 
-import { fetchSessions } from './utils/sheets';
-import { fetchExercisesFromSheets, saveExerciseToSheets } from './utils/config';
-
+import AuthScreen from './components/AuthScreen';
 import Header from './components/Header';
 import HomeScreen from './components/HomeScreen';
 import HistoryScreen from './components/HistoryScreen';
@@ -77,6 +80,8 @@ function normalizeEffort(rpeRaw, rirRaw) {
 }
 
 export default function App() {
+  const { session, loading: authLoading, magicLinkSent, sendMagicLink, signOut } = useAuth();
+
   const [toast, setToast] = useState({ message: '', isError: false });
   const [bodyweight, setBodyweight] = useState(() => loadBodyweight());
   const [effortMode, setEffortMode] = useState(() => loadEffortMode());
@@ -87,11 +92,12 @@ export default function App() {
   const [sessionExercises, setSessionExercises] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [showSessionPicker, setShowSessionPicker] = useState(false);
-  const [exerciseRegistry, setExerciseRegistry] = useState(() => loadRegistry());
+  const [exerciseRegistry, setExerciseRegistry] = useState({});
+
   const timer = useTimer();
   const sessionTimer = useSessionTimer();
-  const sheets = useSheets();
-  const { config, saveConfig } = useConfig();
+  const db = useSupabase(session);
+  const { config, configStatus, saveConfig } = useConfig(session);
 
   // Initialize activeWorkoutId once config loads
   useEffect(() => {
@@ -100,18 +106,18 @@ export default function App() {
     }
   }, [config, activeWorkoutId]);
 
-  // Sync exercise registry from Sheets on startup
+  // Show error toast when config could not be loaded from Supabase
   useEffect(() => {
-    if (!sheets.configured) return;
-    fetchExercisesFromSheets().then((remote) => {
-      if (!remote) return;
-      setExerciseRegistry((local) => {
-        const merged = { ...remote, ...local }; // local wins on conflict
-        saveRegistry(merged);
-        return merged;
-      });
-    });
-  }, [sheets.configured]);
+    if (configStatus === 'error') {
+      showToast('Could not load config — check your connection', true);
+    }
+  }, [configStatus]);
+
+  // Load exercise registry from Supabase once authenticated
+  useEffect(() => {
+    if (!session) return;
+    loadRegistry(session.user.id).then(setExerciseRegistry).catch(() => {});
+  }, [session]);
 
   const activeWorkout = config?.workouts.find((w) => w.id === activeWorkoutId) ?? config?.workouts[0];
   const workoutColor = activeWorkout?.color ?? 'a';
@@ -182,22 +188,25 @@ export default function App() {
     );
   };
 
-  const handleSessionExercisePick = (picked) => {
+  const handleSessionExercisePick = async (picked) => {
     setShowSessionPicker(false);
     let exercise;
     if (picked.id) {
-      const preset = PRESET_EXERCISES.find((p) => p.id === picked.id);
-      exercise = { id: picked.id, name: picked.name, sets: preset?.sets ?? 3 };
+      exercise = { id: picked.id, name: picked.name, sets: exerciseRegistry[picked.id]?.sets ?? 3 };
     } else {
       const resolved = resolveExercise(picked.name, exerciseRegistry);
       if (resolved.isNew) {
-        const updated = { ...exerciseRegistry, [resolved.id]: { id: resolved.id, name: resolved.name } };
-        setExerciseRegistry(updated);
-        saveRegistry(updated);
-        saveExerciseToSheets({ id: resolved.id, name: resolved.name });
+        try {
+          const updated = await addExercise({ id: resolved.id, name: resolved.name }, exerciseRegistry, session.user.id);
+          setExerciseRegistry(updated);
+        } catch {
+          // Optimistically update local state even if Supabase insert fails
+          const updated = { ...exerciseRegistry, [resolved.id]: { id: resolved.id, name: resolved.name } };
+          setExerciseRegistry(updated);
+          saveRegistryToStorage(updated, session.user.id);
+        }
       }
-      const preset = PRESET_EXERCISES.find((p) => p.id === resolved.id);
-      exercise = { id: resolved.id, name: resolved.name, sets: preset?.sets ?? 3 };
+      exercise = { id: resolved.id, name: resolved.name, sets: 3 };
     }
     setSessionExercises((prev) => [...(prev ?? exercises), exercise]);
   };
@@ -285,15 +294,17 @@ export default function App() {
       return;
     }
 
-    if (!sheets.configured) {
-      showToast('Connect Google Sheets first!', true);
-      return;
-    }
-
     setSaving(true);
     const duration = sessionTimer.stop();
     try {
-      await sheets.save({ workout: workoutLabel, workoutColor, bodyweight, exercises: exercisesData, duration });
+      await db.save({
+        workout: workoutLabel,
+        workoutId: activeWorkoutId,
+        workoutColor,
+        bodyweight,
+        exercises: exercisesData,
+        duration,
+      });
       exercises.forEach((ex) => clearFields(ex.id, ex.sets));
       setFieldVersion((v) => v + 1);
       setScreen('home');
@@ -311,7 +322,7 @@ export default function App() {
     const date = new Date().toLocaleDateString('en-GB', {
       day: '2-digit', month: 'short', year: 'numeric',
     });
-    let text = `Fitlog Workout ${workoutLabel} — ${date}\nBW: ${bodyweight} kg\n${'─'.repeat(30)}\n`;
+    let text = `Fitlog Workout ${workoutLabel || 'Session'} — ${date}\nBW: ${bodyweight} kg\n${'─'.repeat(30)}\n`;
 
     exercises.forEach((ex) => {
       text += `\n${ex.name}\n`;
@@ -351,6 +362,21 @@ export default function App() {
     showToast('Workouts saved');
   };
 
+  // ── Auth gate ─────────────────────────────────────────────────
+
+  if (authLoading) return null;
+
+  if (!session) {
+    return (
+      <AuthScreen
+        onSendMagicLink={sendMagicLink}
+        magicLinkSent={magicLinkSent}
+      />
+    );
+  }
+
+  // ── App screens ───────────────────────────────────────────────
+
   if (screen === 'manage' && config) {
     return (
       <ManageWorkouts
@@ -358,7 +384,8 @@ export default function App() {
         onSave={handleManageSave}
         onCancel={() => setScreen('home')}
         registry={exerciseRegistry}
-        onRegistryUpdate={(updated) => { setExerciseRegistry(updated); saveRegistry(updated); }}
+        userId={session.user.id}
+        onRegistryUpdate={(updated) => { setExerciseRegistry(updated); saveRegistryToStorage(updated, session.user.id); }}
       />
     );
   }
@@ -370,7 +397,8 @@ export default function App() {
       <>
         <HistoryScreen
           onBack={() => setScreen('home')}
-          onFetch={fetchSessions}
+          sessions={db.sessions}
+          loading={db.status === 'syncing'}
         />
         <Toast
           message={toast.message}
@@ -389,13 +417,8 @@ export default function App() {
           onStart={handleStartSession}
           onManage={() => setScreen('manage')}
           onHistory={() => setScreen('history')}
-          sheetsConfigured={sheets.configured}
-          onConnect={async (url) => {
-            const ok = await sheets.connect(url);
-            if (ok) showToast('Connected to Google Sheets!');
-            else showToast('Connection failed — check URL', true);
-            return ok;
-          }}
+          onSignOut={signOut}
+          syncStatus={db.status}
         />
         <Toast
           message={toast.message}
@@ -411,7 +434,7 @@ export default function App() {
       <Header
         workoutColor={workoutColor}
         workoutLabel={workoutLabel}
-        syncStatus={sheets.status}
+        syncStatus={db.status}
         bodyweight={bodyweight}
         onBodyweightChange={handleBodyweightChange}
         onBack={handleBack}
@@ -429,41 +452,48 @@ export default function App() {
         workoutColor={workoutColor}
       />
 
-      <div className="effort-toggle mono">
+      {/* Effort mode toggle */}
+      <div
+        className="inline-flex items-center gap-2 mb-3 px-2.5 py-1.5 rounded-full border border-line bg-surface font-mono text-[0.7rem] text-muted"
+        style={{ '--accent': `var(--accent-${workoutColor})`, '--accent-dim': `var(--accent-${workoutColor}-dim)` }}
+      >
         <span>INPUT</span>
-        <button
-          className={`effort-mode-btn ${effortMode === 'rpe' ? `active accent-${workoutColor}` : ''}`}
-          onClick={() => handleEffortModeChange('rpe')}
-        >
-          RPE
-        </button>
-        <button
-          className={`effort-mode-btn ${effortMode === 'rir' ? `active accent-${workoutColor}` : ''}`}
-          onClick={() => handleEffortModeChange('rir')}
-        >
-          RIR
-        </button>
+        {['rpe', 'rir'].map((mode) => (
+          <button
+            key={mode}
+            className={`border rounded-full px-2.5 py-1 font-mono text-[0.72rem] cursor-pointer transition-colors ${
+              effortMode === mode
+                ? 'font-bold border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-dim)]'
+                : 'border-line bg-surface2 text-muted'
+            }`}
+            onClick={() => handleEffortModeChange(mode)}
+          >
+            {mode.toUpperCase()}
+          </button>
+        ))}
       </div>
 
       {exercises.map((ex) => (
         <React.Fragment key={ex.id}>
           {editMode && (
-            <div className="session-ex-edit">
-              <span className="session-ex-edit-name">{ex.name}</span>
-              <div className="session-ex-edit-actions">
+            <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-surface border border-line rounded-t-card -mb-[2px]">
+              <span className="text-[0.78rem] font-semibold text-muted flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
+                {ex.name}
+              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
-                  className="session-stepper"
+                  className="w-7 h-7 rounded-md border-[1.5px] border-line bg-surface2 text-text text-base cursor-pointer flex items-center justify-center transition-colors hover:enabled:border-muted disabled:opacity-30 disabled:cursor-not-allowed"
                   onClick={() => updateSessionExerciseSets(ex.id, -1)}
                   disabled={ex.sets <= 1}
                 >−</button>
-                <span className="session-sets-val mono">{ex.sets} sets</span>
+                <span className="font-mono text-[0.75rem] text-muted min-w-[42px] text-center">{ex.sets} sets</span>
                 <button
-                  className="session-stepper"
+                  className="w-7 h-7 rounded-md border-[1.5px] border-line bg-surface2 text-text text-base cursor-pointer flex items-center justify-center transition-colors hover:enabled:border-muted disabled:opacity-30 disabled:cursor-not-allowed"
                   onClick={() => updateSessionExerciseSets(ex.id, 1)}
                   disabled={ex.sets >= 10}
                 >+</button>
                 <button
-                  className="session-remove-btn"
+                  className="px-2 py-1 rounded-md border-[1.5px] border-line bg-transparent text-red text-[0.8rem] cursor-pointer transition-all hover:bg-[rgba(255,74,106,0.1)] hover:border-red"
                   onClick={() => removeExerciseFromSession(ex.id)}
                 >✕</button>
               </div>
@@ -471,8 +501,8 @@ export default function App() {
           )}
           <ExerciseCard
             exercise={ex}
-            lastLift={sheets.lastLifts[ex.id] || null}
-            personalBest={sheets.personalBests[ex.id] || null}
+            lastLift={db.lastLifts[ex.id] || null}
+            personalBest={db.personalBests[ex.id] || null}
             workoutColor={workoutColor}
             fieldVersion={fieldVersion}
             effortMode={effortMode}
@@ -482,12 +512,18 @@ export default function App() {
       ))}
 
       {editMode && (
-        <div className="session-edit-footer">
-          <button className="session-add-btn" onClick={() => setShowSessionPicker(true)}>
+        <div
+          className="flex gap-2.5 mt-2"
+          style={{ '--accent': `var(--accent-${workoutColor})`, '--accent-dim': `var(--accent-${workoutColor}-dim)` }}
+        >
+          <button
+            className="flex-1 py-[13px] rounded-card border-2 border-dashed border-line bg-transparent text-muted font-sans font-bold text-[0.9rem] cursor-pointer transition-all hover:border-muted hover:text-text"
+            onClick={() => setShowSessionPicker(true)}
+          >
             + ADD EXERCISE
           </button>
           <button
-            className={`session-save-routine-btn accent-${workoutColor}`}
+            className="flex-1 py-[13px] rounded-card border-2 border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)] font-sans font-bold text-[0.9rem] cursor-pointer transition-all"
             onClick={handleSaveToRoutine}
           >
             SAVE TO ROUTINE

@@ -322,7 +322,7 @@ export default function App() {
     const date = new Date().toLocaleDateString('en-GB', {
       day: '2-digit', month: 'short', year: 'numeric',
     });
-    let text = `Fitlog Workout ${workoutLabel} — ${date}\nBW: ${bodyweight} kg\n${'─'.repeat(30)}\n`;
+    let text = `Fitlog Workout ${workoutLabel || 'Session'} — ${date}\nBW: ${bodyweight} kg\n${'─'.repeat(30)}\n`;
 
     exercises.forEach((ex) => {
       text += `\n${ex.name}\n`;

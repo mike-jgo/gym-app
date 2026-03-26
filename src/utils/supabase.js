@@ -9,8 +9,9 @@ export const supabase = createClient(
 // ── Auth helpers ──────────────────────────────────────────────
 
 export async function getCurrentUserId() {
-  const { data: { user } } = await supabase.auth.getUser();
-  return user?.id ?? null;
+  // getSession() reads from the in-memory/storage cache — no network round-trip.
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user?.id ?? null;
 }
 
 // ── Exercise registry ─────────────────────────────────────────
@@ -36,6 +37,7 @@ export async function insertExercise({ id, name }) {
 // ── Workout config ────────────────────────────────────────────
 
 export async function fetchWorkouts() {
+  const userId = await getCurrentUserId();
   const { data, error } = await supabase
     .from('workouts')
     .select(`
@@ -45,6 +47,7 @@ export async function fetchWorkouts() {
         exercises ( id, name )
       )
     `)
+    .eq('user_id', userId)
     .order('sort_order');
   if (error) throw error;
 
@@ -100,9 +103,13 @@ export async function saveSession({ id, workout, workoutId, workoutColor, bodywe
 }
 
 export async function fetchSessions() {
+  const userId = await getCurrentUserId();
+  // Fetches all sessions with no date limit — acceptable for a single-user app,
+  // but should be capped (e.g. last 180 days) if history grows large.
   const { data, error } = await supabase
     .from('sessions')
     .select('*')
+    .eq('user_id', userId)
     .order('date', { ascending: false });
   if (error) throw error;
   // Normalize snake_case DB columns to camelCase for the rest of the app
@@ -145,11 +152,6 @@ export function computePersonalBests(sessions) {
         };
       }
       const pb = pbs[exId];
-
-      if ((exercise.best1RM ?? 0) > pb.best1RM) {
-        pb.best1RM = exercise.best1RM;
-        pb.best1RMDate = session.date;
-      }
 
       if ((exercise.totalVolume ?? 0) > pb.bestVolume) {
         pb.bestVolume = exercise.totalVolume;

@@ -1,75 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { formatDateTime, formatDuration } from '../utils/date';
 import StatsView from './StatsView';
-import './HistoryScreen.css';
 
-export default function HistoryScreen({ onBack, onFetch }) {
-  const [sessions, setSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const ACCENT = {
+  a: 'var(--accent-a)', b: 'var(--accent-b)', c: 'var(--accent-c)',
+  d: 'var(--accent-d)', e: 'var(--accent-e)', f: 'var(--accent-f)',
+};
+
+export default function HistoryScreen({ onBack, sessions, loading }) {
   const [tab, setTab] = useState('log');
 
-  useEffect(() => {
-    onFetch()
-      .then(setSessions)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   return (
-    <div className="history-screen">
-      <div className="history-header">
-        <button className="back-btn" onClick={onBack} aria-label="Back to home">←</button>
-        <h1 className="history-title mono">HISTORY</h1>
+    <div className="flex flex-col gap-4 pt-4">
+      {/* Header */}
+      <div className="flex items-center gap-2 pb-2">
+        <button className="text-muted text-xl bg-transparent border-none cursor-pointer pr-2 hover:text-text" onClick={onBack} aria-label="Back to home">←</button>
+        <h1 className="font-mono text-2xl font-extrabold tracking-tight">HISTORY</h1>
       </div>
 
-      <div className="history-tabs">
-        <button
-          className={`history-tab mono${tab === 'log' ? ' active' : ''}`}
-          onClick={() => setTab('log')}
-        >
-          LOG
-        </button>
-        <button
-          className={`history-tab mono${tab === 'stats' ? ' active' : ''}`}
-          onClick={() => setTab('stats')}
-        >
-          STATS
-        </button>
+      {/* Tabs */}
+      <div className="flex gap-1 p-[3px] bg-surface border border-line rounded-lg w-fit mb-1">
+        {['log', 'stats'].map((t) => (
+          <button
+            key={t}
+            className={`font-mono text-[0.72rem] font-bold tracking-widest px-4 py-1.5 rounded-md border-none cursor-pointer transition-colors ${
+              tab === t ? 'bg-surface2 text-text' : 'bg-transparent text-muted'
+            }`}
+            onClick={() => setTab(t)}
+          >
+            {t.toUpperCase()}
+          </button>
+        ))}
       </div>
 
-      {loading && <p className="history-status history-loading mono">Loading…</p>}
-      {error && <p className="history-status history-error">{error}</p>}
-
-      {!loading && !error && tab === 'stats' && (
-        <StatsView sessions={sessions} />
+      {loading && (
+        <p className="font-mono text-muted text-sm animate-pulse-slow">Loading…</p>
       )}
 
-      {!loading && !error && tab === 'log' && (
+      {!loading && tab === 'stats' && <StatsView sessions={sessions} />}
+
+      {!loading && tab === 'log' && (
         <>
           {sessions.length === 0 && (
-            <p className="history-status">No sessions recorded yet.</p>
+            <p className="text-muted text-sm">No sessions recorded yet.</p>
           )}
-          <div className="session-list">
+          <div className="flex flex-col gap-3 pb-5">
             {sessions.map((session) => (
-              <div key={session.id} className={`session-card border-${session.workoutColor}`}>
-                <div className="session-card-header">
-                  <span className="session-date mono">{formatDateTime(session.date)}</span>
-                  <span className={`session-workout-label mono accent-${session.workoutColor}`}>
+              <div
+                key={session.id}
+                className="bg-surface rounded-xl border-l-4 px-4 py-3.5 flex flex-col gap-2.5"
+                style={{ borderLeftColor: ACCENT[session.workoutColor] ?? ACCENT.a }}
+              >
+                <div className="flex justify-between items-baseline">
+                  <span className="font-mono text-[0.85rem] font-bold text-text">
+                    {formatDateTime(session.date)}
+                  </span>
+                  <span
+                    className="font-mono text-[0.75rem] font-bold"
+                    style={{ color: ACCENT[session.workoutColor] ?? ACCENT.a }}
+                  >
                     {session.workout}
                   </span>
                 </div>
-                <div className="session-meta mono">
+                <div className="flex gap-3 font-mono text-[0.7rem] text-muted">
                   <span>BW {session.bodyweight} kg</span>
                   {session.duration > 0 && <span>{formatDuration(session.duration)}</span>}
                 </div>
-                <div className="session-exercises">
+                <div className="flex flex-col gap-2">
                   {session.exercises.map((ex) => (
-                    <div key={ex.id} className="session-exercise">
-                      <span className="session-exercise-name">{ex.name}</span>
-                      <div className="session-sets">
+                    <div key={ex.id} className="flex flex-col gap-1">
+                      <span className="text-[0.8rem] font-semibold text-text">{ex.name}</span>
+                      <div className="flex gap-1.5 flex-wrap">
                         {ex.sets.map((s) => (
-                          <span key={s.set} className="session-set mono">
+                          <span key={s.set} className="font-mono text-[0.7rem] text-muted bg-surface2 px-2 py-[2px] rounded">
                             {s.weight}x{s.reps}
                             {Number.isFinite(parseFloat(s.rpe)) && ` @${parseFloat(s.rpe)}`}
                             {Number.isFinite(parseFloat(s.rir)) && ` (RIR ${parseFloat(s.rir)})`}

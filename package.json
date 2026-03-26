@@ -10,9 +10,12 @@
     "deploy": "vite build && gh-pages -d dist"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.100.0",
+    "@tailwindcss/vite": "^4.2.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "recharts": "^3.7.0"
+    "recharts": "^3.7.0",
+    "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.4.1",

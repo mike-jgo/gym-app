@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { calc1RM } from './utils/calc';
 import {
-  loadRegistryFromStorage,
   saveRegistryToStorage,
   loadRegistry,
   resolveExercise,
@@ -93,12 +92,12 @@ export default function App() {
   const [sessionExercises, setSessionExercises] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [showSessionPicker, setShowSessionPicker] = useState(false);
-  const [exerciseRegistry, setExerciseRegistry] = useState(() => loadRegistryFromStorage());
+  const [exerciseRegistry, setExerciseRegistry] = useState({});
 
   const timer = useTimer();
   const sessionTimer = useSessionTimer();
   const db = useSupabase(session);
-  const { config, saveConfig } = useConfig(session);
+  const { config, configStatus, saveConfig } = useConfig(session);
 
   // Initialize activeWorkoutId once config loads
   useEffect(() => {
@@ -107,10 +106,17 @@ export default function App() {
     }
   }, [config, activeWorkoutId]);
 
+  // Show error toast when config could not be loaded from Supabase
+  useEffect(() => {
+    if (configStatus === 'error') {
+      showToast('Could not load config — check your connection', true);
+    }
+  }, [configStatus]);
+
   // Load exercise registry from Supabase once authenticated
   useEffect(() => {
     if (!session) return;
-    loadRegistry().then(setExerciseRegistry).catch(() => {});
+    loadRegistry(session.user.id).then(setExerciseRegistry).catch(() => {});
   }, [session]);
 
   const activeWorkout = config?.workouts.find((w) => w.id === activeWorkoutId) ?? config?.workouts[0];
@@ -191,13 +197,13 @@ export default function App() {
       const resolved = resolveExercise(picked.name, exerciseRegistry);
       if (resolved.isNew) {
         try {
-          const updated = await addExercise({ id: resolved.id, name: resolved.name }, exerciseRegistry);
+          const updated = await addExercise({ id: resolved.id, name: resolved.name }, exerciseRegistry, session.user.id);
           setExerciseRegistry(updated);
         } catch {
           // Optimistically update local state even if Supabase insert fails
           const updated = { ...exerciseRegistry, [resolved.id]: { id: resolved.id, name: resolved.name } };
           setExerciseRegistry(updated);
-          saveRegistryToStorage(updated);
+          saveRegistryToStorage(updated, session.user.id);
         }
       }
       exercise = { id: resolved.id, name: resolved.name, sets: 3 };
@@ -378,7 +384,8 @@ export default function App() {
         onSave={handleManageSave}
         onCancel={() => setScreen('home')}
         registry={exerciseRegistry}
-        onRegistryUpdate={(updated) => { setExerciseRegistry(updated); saveRegistryToStorage(updated); }}
+        userId={session.user.id}
+        onRegistryUpdate={(updated) => { setExerciseRegistry(updated); saveRegistryToStorage(updated, session.user.id); }}
       />
     );
   }

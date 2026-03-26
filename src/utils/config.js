@@ -5,28 +5,30 @@ export const CONFIG_KEY = 'fbeod_config';
 
 const COLORS = ['a', 'b', 'c', 'd', 'e', 'f'];
 
-export function loadConfigFromStorage() {
+export function loadConfigFromStorage(userId) {
   try {
     const raw = localStorage.getItem(CONFIG_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !Array.isArray(parsed.workouts)) return null;
-    return parsed;
+    if (parsed.userId !== userId) return null;
+    const { userId: _uid, ...config } = parsed;
+    return config;
   } catch {
     return null;
   }
 }
 
-export function saveConfigToStorage(config) {
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+export function saveConfigToStorage(config, userId) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify({ userId, ...config }));
 }
 
 export async function fetchConfigFromSupabase() {
   return fetchWorkouts();
 }
 
-export async function saveConfig(config) {
-  saveConfigToStorage(config);
+export async function saveConfig(config, userId) {
+  saveConfigToStorage(config, userId);
   await saveConfigToSupabase(config);
 }
 

@@ -6,25 +6,34 @@ function normalize(name) {
   return name.toLowerCase().trim();
 }
 
-export function loadRegistryFromStorage() {
+export function loadRegistryFromStorage(userId) {
   try {
     const raw = localStorage.getItem(REGISTRY_KEY);
-    return raw ? JSON.parse(raw) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed._userId !== userId) return {};
+    const { _userId, ...registry } = parsed;
+    return registry;
   } catch {
     return {};
   }
 }
 
-export function saveRegistryToStorage(registry) {
-  localStorage.setItem(REGISTRY_KEY, JSON.stringify(registry));
+export function saveRegistryToStorage(registry, userId) {
+  localStorage.setItem(REGISTRY_KEY, JSON.stringify({ _userId: userId, ...registry }));
 }
 
 // Fetch all exercises (presets + user custom) from Supabase.
+// Falls back to the user-scoped local cache if Supabase is unavailable.
 // Returns { [id]: { id, name } } map.
-export async function loadRegistry() {
-  const registry = await fetchExercises();
-  saveRegistryToStorage(registry);
-  return registry;
+export async function loadRegistry(userId) {
+  try {
+    const registry = await fetchExercises();
+    saveRegistryToStorage(registry, userId);
+    return registry;
+  } catch {
+    return loadRegistryFromStorage(userId);
+  }
 }
 
 // Returns { id, name, isNew? }
@@ -39,9 +48,9 @@ export function resolveExercise(name, registry) {
 }
 
 // Persist a new custom exercise to Supabase + local cache.
-export async function addExercise(exercise, registry) {
+export async function addExercise(exercise, registry, userId) {
   await insertExercise(exercise);
   const updated = { ...registry, [exercise.id]: { id: exercise.id, name: exercise.name } };
-  saveRegistryToStorage(updated);
+  saveRegistryToStorage(updated, userId);
   return updated;
 }

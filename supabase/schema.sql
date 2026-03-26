@@ -115,3 +115,62 @@ INSERT INTO exercises (id, name, is_preset) VALUES
   ('ab_crunch',    'Cable Crunch',                 true),
   ('hip_thrust',   'Hip Thrust',                   true)
 ON CONFLICT (id) DO NOTHING;
+
+-- ── RPC: atomic config save ───────────────────────────────────
+-- Replaces the multi-step JS loop in saveConfig. Runs in a single
+-- transaction so a mid-save failure can never leave partial state.
+-- Uses auth.uid() from the caller's JWT — no extra network round-trip.
+CREATE OR REPLACE FUNCTION save_config(config_json JSONB)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  uid       UUID    := auth.uid();
+  keep_ids  TEXT[];
+  workout   JSONB;
+  exercise  JSONB;
+  w_idx     INT := 0;
+  ex_idx    INT;
+BEGIN
+  IF uid IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- Collect IDs of workouts to keep
+  SELECT ARRAY(
+    SELECT elem->>'id'
+    FROM jsonb_array_elements(config_json->'workouts') AS elem
+  ) INTO keep_ids;
+
+  -- Delete removed workouts; ON DELETE CASCADE cleans up their workout_exercises
+  DELETE FROM workouts
+  WHERE user_id = uid
+    AND NOT (id = ANY(keep_ids));
+
+  -- Upsert each workout and replace its exercises atomically
+  FOR workout IN SELECT jsonb_array_elements(config_json->'workouts') LOOP
+    INSERT INTO workouts (id, user_id, label, color, sort_order)
+    VALUES (
+      workout->>'id', uid, workout->>'label', workout->>'color', w_idx
+    )
+    ON CONFLICT (id, user_id) DO UPDATE SET
+      label      = EXCLUDED.label,
+      color      = EXCLUDED.color,
+      sort_order = EXCLUDED.sort_order;
+
+    DELETE FROM workout_exercises
+    WHERE workout_id = workout->>'id' AND user_id = uid;
+
+    ex_idx := 0;
+    FOR exercise IN SELECT jsonb_array_elements(workout->'exercises') LOOP
+      INSERT INTO workout_exercises (workout_id, user_id, exercise_id, sets, sort_order)
+      VALUES (
+        workout->>'id', uid, exercise->>'id', (exercise->>'sets')::INT, ex_idx
+      );
+      ex_idx := ex_idx + 1;
+    END LOOP;
+
+    w_idx := w_idx + 1;
+  END LOOP;
+END;
+$$;

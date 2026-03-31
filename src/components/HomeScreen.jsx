@@ -1,4 +1,5 @@
 import React from 'react';
+import { syncDotClass } from '../utils/ui';
 
 const ACCENT = {
   a: 'var(--accent-a)', b: 'var(--accent-b)', c: 'var(--accent-c)',
@@ -7,9 +8,9 @@ const ACCENT = {
 
 export default function HomeScreen({ workouts, onStart, onManage, onHistory, onSignOut, syncStatus }) {
   return (
-    <div className="flex flex-col gap-4 pt-8">
+    <div className="flex flex-col gap-4 pt-3">
       {/* Title + sync dot */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pb-2">
         <h1 className="font-mono text-2xl font-extrabold tracking-tight">FITLOG</h1>
         <div className={`w-2 h-2 rounded-full shrink-0 ${syncDotClass(syncStatus)}`}
           title={`Supabase: ${syncStatus}`} />
@@ -65,9 +66,3 @@ export default function HomeScreen({ workouts, onStart, onManage, onHistory, onS
   );
 }
 
-function syncDotClass(status) {
-  if (status === 'connected') return 'bg-green shadow-[0_0_8px_var(--green-dim)]';
-  if (status === 'syncing')   return 'bg-yellow animate-pulse-dot';
-  if (status === 'error')     return 'bg-red';
-  return 'bg-muted';
-}

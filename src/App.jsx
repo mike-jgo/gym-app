@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { calc1RM } from './utils/calc';
+import { normalizeEffort } from './utils/effort';
 import {
   saveRegistryToStorage,
   loadRegistry,
@@ -31,53 +32,8 @@ import FooterActions from './components/FooterActions';
 import Toast from './components/Toast';
 import ManageWorkouts from './components/ManageWorkouts';
 import SessionExercisePicker from './components/SessionExercisePicker';
-
-const EFFORT_EPSILON = 0.0001;
-
-function isHalfStep(value) {
-  return Math.abs((value * 2) - Math.round(value * 2)) < EFFORT_EPSILON;
-}
-
-function roundEffort(value) {
-  return Math.round(value * 10) / 10;
-}
-
-function parseEffortValue(value) {
-  if (value === '' || value == null) return null;
-  const parsed = parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function normalizeEffort(rpeRaw, rirRaw) {
-  let rpe = parseEffortValue(rpeRaw);
-  let rir = parseEffortValue(rirRaw);
-
-  if (rpe == null && rir == null) {
-    return { rpe: null, rir: null, error: null };
-  }
-
-  if (rpe != null && (rpe < 6 || rpe > 10 || !isHalfStep(rpe))) {
-    return { error: 'RPE must be 6-10 in 0.5 steps' };
-  }
-
-  if (rir != null && (rir < 0 || rir > 4 || !isHalfStep(rir))) {
-    return { error: 'RIR must be 0-4 in 0.5 steps' };
-  }
-
-  if (rpe == null && rir != null) {
-    rpe = 10 - rir;
-  } else if (rir == null && rpe != null) {
-    rir = 10 - rpe;
-  } else if (rpe != null && rir != null) {
-    rir = 10 - rpe;
-  }
-
-  return {
-    rpe: roundEffort(rpe),
-    rir: roundEffort(rir),
-    error: null,
-  };
-}
+import EffortModeToggle from './components/EffortModeToggle';
+import ExerciseEditBar from './components/ExerciseEditBar';
 
 export default function App() {
   const { session, loading: authLoading, magicLinkSent, sendMagicLink, signOut, returnToApp } = useAuth();
@@ -186,6 +142,18 @@ export default function App() {
     setSessionExercises((prev) =>
       prev.map((e) => e.id === exId ? { ...e, sets: Math.max(1, Math.min(10, e.sets + delta)) } : e)
     );
+  };
+
+  const moveSessionExercise = (exId, dir) => {
+    setSessionExercises((prev) => {
+      const idx = prev.findIndex((e) => e.id === exId);
+      if (idx < 0) return prev;
+      const next = dir === 'up' ? idx - 1 : idx + 1;
+      if (next < 0 || next >= prev.length) return prev;
+      const arr = [...prev];
+      [arr[idx], arr[next]] = [arr[next], arr[idx]];
+      return arr;
+    });
   };
 
   const handleSessionExercisePick = async (picked) => {
@@ -453,52 +421,23 @@ export default function App() {
         workoutColor={workoutColor}
       />
 
-      {/* Effort mode toggle */}
-      <div
-        className="inline-flex items-center gap-2 mb-3 px-2.5 py-1.5 rounded-full border border-line bg-surface font-mono text-[0.7rem] text-muted"
-        style={{ '--accent': `var(--accent-${workoutColor})`, '--accent-dim': `var(--accent-${workoutColor}-dim)` }}
-      >
-        <span>INPUT</span>
-        {['rpe', 'rir'].map((mode) => (
-          <button
-            key={mode}
-            className={`border rounded-full px-2.5 py-1 font-mono text-[0.72rem] cursor-pointer transition-colors ${
-              effortMode === mode
-                ? 'font-bold border-[var(--accent)] text-[var(--accent)] bg-[var(--accent-dim)]'
-                : 'border-line bg-surface2 text-muted'
-            }`}
-            onClick={() => handleEffortModeChange(mode)}
-          >
-            {mode.toUpperCase()}
-          </button>
-        ))}
-      </div>
+      <EffortModeToggle
+        effortMode={effortMode}
+        onModeChange={handleEffortModeChange}
+        workoutColor={workoutColor}
+      />
 
-      {exercises.map((ex) => (
+      {exercises.map((ex, idx) => (
         <React.Fragment key={ex.id}>
           {editMode && (
-            <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 bg-surface border border-line rounded-t-card -mb-[2px]">
-              <span className="text-[0.78rem] font-semibold text-muted flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
-                {ex.name}
-              </span>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  className="w-7 h-7 rounded-md border-[1.5px] border-line bg-surface2 text-text text-base cursor-pointer flex items-center justify-center transition-colors hover:enabled:border-muted disabled:opacity-30 disabled:cursor-not-allowed"
-                  onClick={() => updateSessionExerciseSets(ex.id, -1)}
-                  disabled={ex.sets <= 1}
-                >−</button>
-                <span className="font-mono text-[0.75rem] text-muted min-w-[42px] text-center">{ex.sets} sets</span>
-                <button
-                  className="w-7 h-7 rounded-md border-[1.5px] border-line bg-surface2 text-text text-base cursor-pointer flex items-center justify-center transition-colors hover:enabled:border-muted disabled:opacity-30 disabled:cursor-not-allowed"
-                  onClick={() => updateSessionExerciseSets(ex.id, 1)}
-                  disabled={ex.sets >= 10}
-                >+</button>
-                <button
-                  className="px-2 py-1 rounded-md border-[1.5px] border-line bg-transparent text-red text-[0.8rem] cursor-pointer transition-all hover:bg-[rgba(255,74,106,0.1)] hover:border-red"
-                  onClick={() => removeExerciseFromSession(ex.id)}
-                >✕</button>
-              </div>
-            </div>
+            <ExerciseEditBar
+              exercise={ex}
+              isFirst={idx === 0}
+              isLast={idx === exercises.length - 1}
+              onRemove={removeExerciseFromSession}
+              onUpdateSets={updateSessionExerciseSets}
+              onMove={moveSessionExercise}
+            />
           )}
           <ExerciseCard
             exercise={ex}

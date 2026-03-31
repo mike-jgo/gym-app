@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { syncDotClass } from '../utils/ui';
 
 const ACCENT = {
   a: 'var(--accent-a)', b: 'var(--accent-b)', c: 'var(--accent-c)',
@@ -72,9 +73,3 @@ export default function Header({ workoutColor, workoutLabel, syncStatus, bodywei
   );
 }
 
-function syncDotClass(status) {
-  if (status === 'connected') return 'bg-green shadow-[0_0_8px_var(--green-dim)]';
-  if (status === 'syncing')   return 'bg-yellow animate-pulse-dot';
-  if (status === 'error')     return 'bg-red';
-  return 'bg-muted';
-}

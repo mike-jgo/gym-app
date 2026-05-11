@@ -25,7 +25,7 @@ npx vitest run src/__tests__/calc.test.js
 
 **No router.** Navigation is a `screen` state string in `App.jsx` - values: `'home'`, `'session'`, `'history'`, `'manage'`. All screen switching happens in App via callbacks passed down.
 
-**Auth:** Email/password login through the Express API. Sessions are stored in same-origin HttpOnly cookies named `fitlog_session`. Public signup is disabled; create/update the admin user with `npm run seed:user`.
+**Auth:** Email/password login through the Express API. Sessions are stored in same-origin HttpOnly cookies named `fitlog_session`. Public signup is disabled; the app creates/updates the admin user at startup when `ADMIN_EMAIL` and `ADMIN_PASSWORD` are set. `npm run seed:user` is still available for manual seeding.
 
 **Data persistence:** Browser code calls `/api/*` through `src/utils/api.js` and data helpers in `src/utils/dataApi.js`. Workout config is stored both in Postgres and localStorage (`fbeod_config`).
 

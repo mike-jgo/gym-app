@@ -39,10 +39,9 @@ Set production values for `POSTGRES_PASSWORD`, `SESSION_SECRET`, `ADMIN_EMAIL`, 
 
 ```bash
 docker compose up -d --build
-docker compose run --rm app npm run seed:user
 ```
 
-Serve the app behind HTTPS on your VPS and proxy traffic to port `3000`.
+Serve the app behind HTTPS on your VPS and proxy traffic to port `3000`. If `ADMIN_EMAIL` and `ADMIN_PASSWORD` are set, the app creates or updates that admin user at startup.
 
 ## Commands
 

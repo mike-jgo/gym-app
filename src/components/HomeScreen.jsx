@@ -13,7 +13,7 @@ export default function HomeScreen({ workouts, onStart, onManage, onHistory, onS
       <div className="flex items-center justify-between pb-2">
         <h1 className="font-mono text-2xl font-extrabold tracking-tight">FITLOG</h1>
         <div className={`w-2 h-2 rounded-full shrink-0 ${syncDotClass(syncStatus)}`}
-          title={`Supabase: ${syncStatus}`} />
+          title={`Database: ${syncStatus}`} />
       </div>
 
       {/* Workout cards */}
@@ -65,4 +65,3 @@ export default function HomeScreen({ workouts, onStart, onManage, onHistory, onS
     </div>
   );
 }
-

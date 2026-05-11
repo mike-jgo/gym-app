@@ -1,4 +1,4 @@
-import { fetchExercises, insertExercise } from './supabase';
+import { fetchExercises, insertExercise } from './dataApi';
 
 export const REGISTRY_KEY = 'fbeod_exercises';
 
@@ -23,8 +23,8 @@ export function saveRegistryToStorage(registry, userId) {
   localStorage.setItem(REGISTRY_KEY, JSON.stringify({ userId, ...registry }));
 }
 
-// Fetch all exercises (presets + user custom) from Supabase.
-// Falls back to the user-scoped local cache if Supabase is unavailable.
+// Fetch all exercises (presets + user custom) from the API.
+// Falls back to the user-scoped local cache if the API is unavailable.
 // Returns { [id]: { id, name } } map.
 export async function loadRegistry(userId) {
   try {
@@ -47,7 +47,7 @@ export function resolveExercise(name, registry) {
   return { id, name: name.trim(), isNew: true };
 }
 
-// Persist a new custom exercise to Supabase + local cache.
+// Persist a new custom exercise to the API + local cache.
 export async function addExercise(exercise, registry, userId) {
   await insertExercise(exercise);
   const updated = { ...registry, [exercise.id]: { id: exercise.id, name: exercise.name } };

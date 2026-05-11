@@ -66,10 +66,9 @@ export default function Header({ workoutColor, workoutLabel, syncStatus, bodywei
         {/* Sync dot */}
         <div
           className={`w-2 h-2 rounded-full shrink-0 transition-colors duration-300 ${syncDotClass(syncStatus)}`}
-          title={`Supabase: ${syncStatus}`}
+          title={`Database: ${syncStatus}`}
         />
       </div>
     </div>
   );
 }
-

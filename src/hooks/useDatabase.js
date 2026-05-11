@@ -4,9 +4,9 @@ import {
   saveSession,
   computeLastLifts,
   computePersonalBests,
-} from '../utils/supabase';
+} from '../utils/dataApi';
 
-export function useSupabase(session) {
+export function useDatabase(session) {
   const [status, setStatus] = useState('syncing'); // syncing | connected | saving | error
   const [lastLifts, setLastLifts] = useState({});
   const [personalBests, setPersonalBests] = useState({});

@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Mock supabase before importing exerciseRegistry so the Supabase client is
-// never instantiated (import.meta.env would be undefined in the test env).
-vi.mock('../utils/supabase', () => ({
+// Mock API-backed persistence before importing exerciseRegistry.
+vi.mock('../utils/dataApi', () => ({
   fetchExercises: vi.fn(),
   insertExercise: vi.fn(),
 }));

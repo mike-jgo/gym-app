@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   loadConfigFromStorage,
   saveConfigToStorage,
-  fetchConfigFromSupabase,
+  fetchConfigFromApi,
   saveConfig as persistConfig,
   seedDefaultWorkouts,
 } from '../utils/config';
@@ -24,16 +24,16 @@ export function useConfig(session) {
         setConfigStatus('ready');
       }
 
-      // 2. Fetch authoritative config from Supabase
+      // 2. Fetch authoritative config from the API
       try {
-        const remote = await fetchConfigFromSupabase();
+        const remote = await fetchConfigFromApi();
 
         if (cancelled) return;
 
         if (remote.workouts.length === 0) {
-          // New user — seed default workouts A & B
+          // New user - seed default workouts A & B
           await seedDefaultWorkouts();
-          const seeded = await fetchConfigFromSupabase();
+          const seeded = await fetchConfigFromApi();
           if (!cancelled) {
             setConfig(seeded);
             saveConfigToStorage(seeded, userId);
@@ -45,7 +45,7 @@ export function useConfig(session) {
           setConfigStatus('ready');
         }
       } catch {
-        // Supabase unavailable — local cache already shown if it existed.
+        // API unavailable - local cache already shown if it existed.
         // Don't fall back to DEFAULT_WORKOUTS: an existing user seeing default
         // workouts could mistakenly log a session on the wrong workout.
         if (!cancelled && !local) {

@@ -2,36 +2,54 @@
 
 A minimal, mobile-first workout tracker. Log sets, track e1RM, and view your progress over time.
 
-**[Open Fitlog](https://mike-jgo.github.io/gym-app/)**
+## Stack
 
----
+- React + Vite PWA
+- Node + Express API
+- Postgres database
+- Docker Compose for VPS deployment
 
-## Using Fitlog
+## Local Development
 
-Fitlog runs in your browser and works as an installable PWA on mobile. Open the link above, enter your email, and sign in via the magic link — no password needed.
-
----
-
-## Running Locally
+Install dependencies:
 
 ```bash
 npm install
+```
+
+Create `.env` from `.env.example`, then run Postgres and the API:
+
+```bash
+docker compose up postgres
+npm run seed:user
+npm run server
+```
+
+In another terminal, run the Vite dev server:
+
+```bash
 npm run dev
 ```
 
-Create a `.env` file with your Supabase credentials (see `.env.example`).
+Vite proxies `/api` to `http://localhost:3000`.
 
-Deploy to GitHub Pages:
+## VPS Deployment
+
+Set production values for `POSTGRES_PASSWORD`, `SESSION_SECRET`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`, then run:
 
 ```bash
-npm run deploy
+docker compose up -d --build
+docker compose run --rm app npm run seed:user
 ```
 
----
+Serve the app behind HTTPS on your VPS and proxy traffic to port `3000`.
 
-## Tech
+## Commands
 
-- React + Vite (PWA)
-- Supabase (auth + database)
-- Tailwind CSS
-- Recharts
+```bash
+npm run dev        # Vite frontend dev server
+npm run server     # Express API + static app server
+npm run seed:user  # Create/update the admin user
+npm run build      # Build React app to dist/
+npm run test       # Run Vitest tests
+```

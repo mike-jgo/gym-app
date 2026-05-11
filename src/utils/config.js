@@ -1,4 +1,4 @@
-import { fetchWorkouts, saveConfig as saveConfigToSupabase } from './supabase';
+import { fetchWorkouts, saveConfig as saveConfigToApi } from './dataApi';
 import { DEFAULT_WORKOUTS } from './workouts';
 
 export const CONFIG_KEY = 'fbeod_config';
@@ -23,17 +23,17 @@ export function saveConfigToStorage(config, userId) {
   localStorage.setItem(CONFIG_KEY, JSON.stringify({ userId, ...config }));
 }
 
-export async function fetchConfigFromSupabase() {
+export async function fetchConfigFromApi() {
   return fetchWorkouts();
 }
 
 export async function saveConfig(config, userId) {
   saveConfigToStorage(config, userId);
-  await saveConfigToSupabase(config);
+  await saveConfigToApi(config);
 }
 
 export async function seedDefaultWorkouts() {
-  await saveConfigToSupabase({ version: 1, workouts: DEFAULT_WORKOUTS });
+  await saveConfigToApi({ version: 1, workouts: DEFAULT_WORKOUTS });
 }
 
 export function generateExerciseId(name) {

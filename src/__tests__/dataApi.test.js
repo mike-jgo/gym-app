@@ -1,17 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// Prevent createClient from executing with undefined env vars at module load
-// time. The pure functions (computeLastLifts, computePersonalBests) do not
-// touch the Supabase client at all — only calc1RM — so a no-op stub is enough.
-vi.mock('@supabase/supabase-js', () => ({
-  createClient: vi.fn(() => ({
-    auth: { getSession: vi.fn() },
-    from: vi.fn(),
-    rpc: vi.fn(),
-  })),
+vi.mock('../utils/api', () => ({
+  apiRequest: vi.fn(),
 }));
 
-import { computeLastLifts, computePersonalBests } from '../utils/supabase';
+import { computeLastLifts, computePersonalBests } from '../utils/dataApi';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 

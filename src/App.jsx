@@ -18,7 +18,7 @@ import {
 import { useAuth } from './hooks/useAuth';
 import { useTimer } from './hooks/useTimer';
 import { useSessionTimer } from './hooks/useSessionTimer';
-import { useSupabase } from './hooks/useSupabase';
+import { useDatabase } from './hooks/useDatabase';
 import { useConfig } from './hooks/useConfig';
 import { formatElapsed } from './utils/date';
 
@@ -36,7 +36,7 @@ import EffortModeToggle from './components/EffortModeToggle';
 import ExerciseEditBar from './components/ExerciseEditBar';
 
 export default function App() {
-  const { session, loading: authLoading, magicLinkSent, sendMagicLink, signOut, returnToApp } = useAuth();
+  const { session, loading: authLoading, signIn, signOut } = useAuth();
 
   const [toast, setToast] = useState({ message: '', isError: false });
   const [bodyweight, setBodyweight] = useState(() => loadBodyweight());
@@ -52,7 +52,7 @@ export default function App() {
 
   const timer = useTimer();
   const sessionTimer = useSessionTimer();
-  const db = useSupabase(session);
+  const db = useDatabase(session);
   const { config, configStatus, saveConfig } = useConfig(session);
 
   // Initialize activeWorkoutId once config loads
@@ -62,14 +62,14 @@ export default function App() {
     }
   }, [config, activeWorkoutId]);
 
-  // Show error toast when config could not be loaded from Supabase
+  // Show error toast when config could not be loaded from the API
   useEffect(() => {
     if (configStatus === 'error') {
       showToast('Could not load config — check your connection', true);
     }
   }, [configStatus]);
 
-  // Load exercise registry from Supabase once authenticated
+  // Load exercise registry from the API once authenticated
   useEffect(() => {
     if (!session) return;
     loadRegistry(session.user.id).then(setExerciseRegistry).catch(() => {});
@@ -168,7 +168,7 @@ export default function App() {
           const updated = await addExercise({ id: resolved.id, name: resolved.name }, exerciseRegistry, session.user.id);
           setExerciseRegistry(updated);
         } catch {
-          // Optimistically update local state even if Supabase insert fails
+          // Optimistically update local state even if the API insert fails
           const updated = { ...exerciseRegistry, [resolved.id]: { id: resolved.id, name: resolved.name } };
           setExerciseRegistry(updated);
           saveRegistryToStorage(updated, session.user.id);
@@ -337,9 +337,7 @@ export default function App() {
   if (!session) {
     return (
       <AuthScreen
-        onSendMagicLink={sendMagicLink}
-        magicLinkSent={magicLinkSent}
-        returnToApp={returnToApp}
+        onSignIn={signIn}
       />
     );
   }

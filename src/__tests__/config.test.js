@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Mock supabase and workouts before importing config so the module-level
-// import.meta.env access and createClient call never executes.
-vi.mock('../utils/supabase', () => ({
+// Mock API-backed persistence before importing config.
+vi.mock('../utils/dataApi', () => ({
   fetchWorkouts: vi.fn(),
   saveConfig: vi.fn(),
 }));
